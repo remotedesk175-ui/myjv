@@ -4,20 +4,22 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Work Log System</title>
-<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0d1117;
-    --surface: #161b22;
-    --surface2: #21262d;
-    --border: #30363d;
-    --accent: #f0a500;
-    --accent2: #58a6ff;
-    --green: #3fb950;
-    --red: #f85149;
-    --text: #e6edf3;
-    --text-muted: #8b949e;
-    --text-dim: #484f58;
+    --bg: #f4f6fa;
+    --surface: #ffffff;
+    --surface2: #eef1f7;
+    --border: #d0d7e3;
+    --accent: #b45309;
+    --accent2: #1d6fce;
+    --green: #16803c;
+    --red: #c0392b;
+    --text: #1a1f2e;
+    --text-muted: #5a6478;
+    --text-dim: #9aa3b5;
+    --yellow-bg: rgba(180,83,9,0.07);
+    --blue-bg: rgba(29,111,206,0.08);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -26,111 +28,127 @@
     background: var(--bg);
     color: var(--text);
     font-family: 'Sarabun', sans-serif;
-    font-size: 14px;
+    font-size: 16px;
+    font-weight: 500;
     min-height: 100vh;
   }
 
-  /* ── HEADER ── */
   header {
     background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 14px 24px;
+    border-bottom: 2px solid var(--accent);
+    padding: 14px 28px;
     display: flex;
     align-items: center;
     gap: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
   }
   header .logo {
     font-family: 'Space Mono', monospace;
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 700;
     color: var(--accent);
     letter-spacing: 1px;
   }
-  header .subtitle { color: var(--text-muted); font-size: 12px; }
+  header .subtitle { color: var(--text-muted); font-size: 13px; font-weight: 500; }
+  .db-status {
+    margin-left: auto;
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-family: 'Space Mono', monospace;
+  }
+  .db-status.ok { background: rgba(22,128,60,0.12); color: var(--green); border: 1px solid rgba(22,128,60,0.3); }
+  .db-status.err { background: rgba(192,57,43,0.1); color: var(--red); border: 1px solid rgba(192,57,43,0.3); }
 
-  /* ── TABS ── */
   .tabs {
     display: flex;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
-    padding: 0 24px;
+    padding: 0 28px;
     gap: 0;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
   }
   .tab-btn {
-    padding: 12px 20px;
+    padding: 13px 22px;
     background: none;
     border: none;
-    border-bottom: 2px solid transparent;
+    border-bottom: 3px solid transparent;
     color: var(--text-muted);
     cursor: pointer;
     font-family: 'Sarabun', sans-serif;
-    font-size: 14px;
-    font-weight: 500;
+    font-size: 16px;
+    font-weight: 600;
     transition: all 0.2s;
+    margin-bottom: -1px;
   }
   .tab-btn:hover { color: var(--text); }
   .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
 
-  /* ── CONTENT ── */
-  .tab-content { display: none; padding: 20px 24px; }
+  .tab-content { display: none; padding: 22px 28px; }
   .tab-content.active { display: block; }
 
-  /* ── TOOLBAR ── */
   .toolbar {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
-    margin-bottom: 16px;
+    margin-bottom: 18px;
     align-items: center;
   }
-  .toolbar label { color: var(--text-muted); font-size: 13px; }
+  .toolbar label { color: var(--text-muted); font-size: 15px; font-weight: 600; }
 
   .btn {
-    padding: 8px 16px;
-    border-radius: 6px;
+    padding: 9px 18px;
+    border-radius: 7px;
     border: 1px solid var(--border);
-    background: var(--surface2);
+    background: var(--surface);
     color: var(--text);
     cursor: pointer;
     font-family: 'Sarabun', sans-serif;
-    font-size: 13px;
-    font-weight: 500;
+    font-size: 15px;
+    font-weight: 600;
     transition: all 0.15s;
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
   }
-  .btn:hover { background: var(--border); }
-  .btn.primary { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 700; }
-  .btn.primary:hover { background: #d4920a; }
-  .btn.success { background: var(--green); border-color: var(--green); color: #000; font-weight: 700; }
+  .btn:hover { background: var(--surface2); border-color: #b0bac8; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { background: #92400e; }
+  .btn.success { background: var(--green); border-color: var(--green); color: #fff; }
+  .btn.success:hover { background: #0f6331; }
   .btn.danger { background: var(--red); border-color: var(--red); color: #fff; }
-  .btn.blue { background: var(--accent2); border-color: var(--accent2); color: #000; font-weight: 700; }
+  .btn.danger:hover { background: #a93226; }
+  .btn.blue { background: var(--accent2); border-color: var(--accent2); color: #fff; }
+  .btn.blue:hover { background: #165da8; }
 
   input[type="file"] { display: none; }
 
   input[type="date"], input[type="text"], input[type="number"] {
-    background: var(--surface2);
-    border: 1px solid var(--border);
+    background: var(--surface);
+    border: 1.5px solid var(--border);
     color: var(--text);
-    padding: 7px 10px;
-    border-radius: 6px;
+    padding: 8px 12px;
+    border-radius: 7px;
     font-family: 'Sarabun', sans-serif;
-    font-size: 13px;
+    font-size: 15px;
+    font-weight: 500;
   }
-  input:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+  input:focus { outline: none; border-color: var(--accent2); box-shadow: 0 0 0 3px rgba(29,111,206,0.12); }
 
-  /* ── TABLE ── */
   .table-wrap {
     overflow-x: auto;
-    border: 1px solid var(--border);
-    border-radius: 8px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    background: var(--surface);
   }
   table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 13px;
-    min-width: 1100px;
+    font-size: 15px;
+    min-width: 1200px;
   }
   thead th {
     background: var(--surface2);
@@ -139,86 +157,111 @@
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    padding: 10px 8px;
+    padding: 11px 10px;
     border-bottom: 2px solid var(--border);
     white-space: nowrap;
     position: sticky;
     top: 0;
     text-align: left;
+    font-weight: 700;
   }
   tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
-  tbody tr:hover { background: rgba(240,165,0,0.04); }
+  tbody tr:hover { background: #f0f4ff; }
   tbody td {
-    padding: 7px 8px;
+    padding: 8px 10px;
     vertical-align: middle;
     color: var(--text);
+    font-weight: 500;
   }
   tbody td input[type="text"],
   tbody td input[type="number"] {
     width: 100%;
     background: transparent;
-    border: 1px solid transparent;
-    padding: 4px 6px;
+    border: 1.5px solid transparent;
+    padding: 5px 7px;
+    font-size: 14px;
   }
   tbody td input:focus {
     background: var(--surface2);
     border-color: var(--accent2);
     outline: none;
-    border-radius: 4px;
+    border-radius: 5px;
   }
 
   .day-badge {
     display: inline-block;
     background: var(--surface2);
     border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 2px 8px;
+    border-radius: 5px;
+    padding: 3px 9px;
     font-family: 'Space Mono', monospace;
     font-size: 11px;
     color: var(--accent2);
     white-space: nowrap;
+    font-weight: 700;
   }
   .date-badge {
     font-family: 'Space Mono', monospace;
-    font-size: 11px;
+    font-size: 12px;
     color: var(--text-muted);
     white-space: nowrap;
+    font-weight: 700;
   }
   .person-chip {
     display: inline-block;
-    background: rgba(88,166,255,0.12);
-    border: 1px solid rgba(88,166,255,0.3);
-    border-radius: 12px;
-    padding: 2px 8px;
-    font-size: 12px;
+    background: var(--blue-bg);
+    border: 1px solid rgba(29,111,206,0.25);
+    border-radius: 14px;
+    padding: 3px 10px;
+    font-size: 13px;
+    font-weight: 600;
     color: var(--accent2);
     white-space: nowrap;
-    margin: 1px 0;
+    margin: 2px 2px;
   }
+  .level-badge {
+    font-size: 10px;
+    font-family: 'Space Mono', monospace;
+    padding: 1px 5px;
+    border-radius: 3px;
+    margin-left: 4px;
+    font-weight: 700;
+  }
+  .lvl1 { background: rgba(180,83,9,0.15); color: var(--accent); }
+  .lvl2 { background: rgba(29,111,206,0.15); color: var(--accent2); }
+  .lvl3 { background: rgba(22,128,60,0.15); color: var(--green); }
+
   .jv-tag {
     display: inline-block;
-    background: rgba(240,165,0,0.12);
-    border: 1px solid rgba(240,165,0,0.3);
-    border-radius: 4px;
-    padding: 1px 6px;
-    font-size: 11px;
+    background: var(--yellow-bg);
+    border: 1px solid rgba(180,83,9,0.25);
+    border-radius: 5px;
+    padding: 2px 8px;
+    font-size: 12px;
     font-family: 'Space Mono', monospace;
     color: var(--accent);
+    font-weight: 700;
   }
   .total-cell {
     font-family: 'Space Mono', monospace;
-    font-size: 12px;
+    font-size: 13px;
     color: var(--green);
     font-weight: 700;
+  }
+  .split-info {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+    display: block;
   }
   .empty-state {
     text-align: center;
     padding: 60px 20px;
     color: var(--text-muted);
+    font-size: 16px;
   }
   .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
 
-  /* ── RADIO GROUP ── */
   .radio-group {
     display: flex;
     gap: 6px;
@@ -229,45 +272,73 @@
     align-items: center;
     gap: 5px;
     cursor: pointer;
-    padding: 6px 12px;
-    border-radius: 6px;
-    border: 1px solid var(--border);
-    background: var(--surface2);
-    font-size: 13px;
+    padding: 7px 14px;
+    border-radius: 7px;
+    border: 1.5px solid var(--border);
+    background: var(--surface);
+    font-size: 15px;
+    font-weight: 600;
     color: var(--text-muted);
     transition: all 0.15s;
     user-select: none;
   }
   .radio-group input[type="radio"] { display: none; }
-  .radio-group input[type="radio"]:checked + span {
-    color: var(--accent);
-  }
   .radio-group label:has(input:checked) {
     border-color: var(--accent);
-    background: rgba(240,165,0,0.1);
+    background: var(--yellow-bg);
     color: var(--accent);
   }
 
-  /* ── DESC POOL TABLE ── */
+  /* MULTI-SELECT PERSONS */
+  .person-multiselect {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    min-width: 180px;
+    max-width: 280px;
+  }
+  .person-toggle {
+    cursor: pointer;
+    padding: 3px 9px;
+    border-radius: 12px;
+    border: 1.5px solid var(--border);
+    background: var(--surface2);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    user-select: none;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .person-toggle.selected {
+    border-color: var(--accent2);
+    background: var(--blue-bg);
+    color: var(--accent2);
+  }
+
+  /* POOL SECTION */
   .pool-section {
-    margin-bottom: 20px;
+    margin-bottom: 22px;
     background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
     overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
   }
   .pool-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 16px;
+    padding: 13px 18px;
     border-bottom: 1px solid var(--border);
     cursor: pointer;
     user-select: none;
+    background: var(--surface2);
   }
   .pool-header h4 {
     font-family: 'Space Mono', monospace;
-    font-size: 12px;
+    font-size: 13px;
+    font-weight: 700;
     color: var(--accent);
     display: flex;
     align-items: center;
@@ -275,62 +346,63 @@
   }
   .pool-header .toggle-icon { transition: transform 0.2s; font-size: 12px; }
   .pool-header .toggle-icon.open { transform: rotate(90deg); }
-  .pool-body { display: none; padding: 14px 16px; }
+  .pool-body { display: none; padding: 16px 18px; }
   .pool-body.open { display: block; }
   .pool-toolbar {
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
     align-items: center;
   }
   .pool-toolbar input { flex: 1; min-width: 120px; max-width: 260px; }
-  .pool-table-wrap { max-height: 260px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; }
-  .pool-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 0; }
+  .pool-table-wrap { max-height: 260px; overflow-y: auto; border: 1.5px solid var(--border); border-radius: 7px; }
+  .pool-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 0; }
   .pool-table thead th {
     background: var(--surface2);
     color: var(--text-muted);
     font-family: 'Space Mono', monospace;
     font-size: 10px;
     text-transform: uppercase;
-    padding: 7px 10px;
+    padding: 8px 12px;
     border-bottom: 1px solid var(--border);
     text-align: left;
     position: sticky; top: 0;
+    font-weight: 700;
   }
   .pool-table tbody tr { border-bottom: 1px solid var(--border); }
-  .pool-table tbody tr:hover { background: rgba(255,255,255,0.03); }
-  .pool-table tbody td { padding: 6px 10px; color: var(--text); vertical-align: middle; }
-  .pool-table tbody td.src-excel { color: var(--text-dim); font-style: italic; font-size: 11px; }
-  .pool-table tbody td.src-manual { color: var(--accent2); font-size: 11px; }
+  .pool-table tbody tr:hover { background: var(--surface2); }
+  .pool-table tbody td { padding: 7px 12px; color: var(--text); vertical-align: middle; font-weight: 500; }
   .badge-count {
-    background: var(--surface2);
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 10px;
-    padding: 1px 8px;
+    padding: 2px 10px;
     font-size: 11px;
     color: var(--text-muted);
     font-family: 'Space Mono', monospace;
+    font-weight: 700;
   }
 
-  /* ── IMPORT PANEL ── */
+  /* IMPORT PANEL */
   .import-panel {
     display: flex;
     gap: 16px;
     flex-wrap: wrap;
-    margin-bottom: 20px;
+    margin-bottom: 22px;
   }
   .import-card {
     background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 16px 20px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 22px;
     min-width: 240px;
     flex: 1;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
   }
-  .import-card h4 { color: var(--accent); font-size: 13px; font-family: 'Space Mono',monospace; margin-bottom: 8px; }
-  .import-card p { color: var(--text-muted); font-size: 12px; margin-bottom: 10px; }
-  .file-name { font-size: 11px; color: var(--green); margin-top: 6px; }
+  .import-card h4 { color: var(--accent); font-size: 14px; font-family: 'Space Mono',monospace; margin-bottom: 8px; font-weight: 700; }
+  .import-card p { color: var(--text-muted); font-size: 14px; margin-bottom: 12px; font-weight: 500; }
+  .file-name { font-size: 13px; color: var(--green); margin-top: 8px; font-weight: 600; }
 
   .status-dot {
     display: inline-block;
@@ -341,38 +413,39 @@
   }
   .status-dot.ok { background: var(--green); }
 
-  /* ── MANPOWER TAB ── */
+  /* MANPOWER */
   .mp-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 16px;
-    margin-top: 8px;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 18px;
+    margin-top: 10px;
   }
   .mp-card {
     background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 20px;
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 22px;
     position: relative;
     overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
   }
   .mp-card::before {
     content: '';
     position: absolute;
     top: 0; left: 0;
-    width: 3px; height: 100%;
+    width: 4px; height: 100%;
     background: var(--accent);
   }
-  .mp-card .emp-name {
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--text);
-    margin-bottom: 2px;
-  }
+  .mp-card .emp-name { font-size: 18px; font-weight: 800; color: var(--text); margin-bottom: 2px; }
   .mp-card .emp-code {
     font-family: 'Space Mono', monospace;
-    font-size: 11px;
+    font-size: 12px;
     color: var(--text-muted);
+    margin-bottom: 6px;
+    font-weight: 700;
+  }
+  .mp-card .emp-level {
+    font-size: 12px; font-weight: 700;
     margin-bottom: 16px;
   }
   .mp-month-grid {
@@ -383,79 +456,49 @@
   .mp-month {
     background: var(--surface2);
     border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 8px;
+    border-radius: 7px;
+    padding: 9px;
     text-align: center;
   }
-  .mp-month .m-label {
-    font-size: 10px;
-    color: var(--text-muted);
-    font-family: 'Space Mono', monospace;
-    margin-bottom: 4px;
-  }
-  .mp-month .sp-val {
-    font-size: 11px;
-    color: var(--text-muted);
-  }
-  .mp-month .pv-val {
-    font-size: 13px;
-    font-weight: 700;
-    font-family: 'Space Mono', monospace;
-    margin-top: 2px;
-  }
-  .mp-month .progress-bar {
-    width: 100%;
-    height: 4px;
-    background: var(--border);
-    border-radius: 2px;
-    margin-top: 6px;
-    overflow: hidden;
-  }
-  .mp-month .progress-fill {
-    height: 100%;
-    border-radius: 2px;
-    transition: width 0.4s ease;
-    background: var(--green);
-  }
+  .mp-month .m-label { font-size: 10px; color: var(--text-muted); font-family: 'Space Mono', monospace; margin-bottom: 4px; font-weight: 700; }
+  .mp-month .sp-val { font-size: 11px; color: var(--text-muted); font-weight: 600; }
+  .mp-month .pv-val { font-size: 14px; font-weight: 800; font-family: 'Space Mono', monospace; margin-top: 3px; }
+  .mp-month .progress-bar { width:100%; height:5px; background: var(--border); border-radius:3px; margin-top:6px; overflow:hidden; }
+  .mp-month .progress-fill { height:100%; border-radius:3px; transition: width 0.4s ease; background: var(--green); }
   .mp-month .progress-fill.warn { background: var(--accent); }
   .mp-month .progress-fill.danger { background: var(--red); }
-  .mp-month .reach-badge {
-    font-size: 10px;
-    margin-top: 4px;
-    padding: 1px 5px;
-    border-radius: 3px;
-    display: inline-block;
-  }
-  .reach-yes { background: rgba(63,185,80,0.15); color: var(--green); }
-  .reach-no  { background: rgba(248,81,73,0.12); color: var(--red); }
+  .mp-month .reach-badge { font-size: 10px; margin-top: 5px; padding: 2px 6px; border-radius: 4px; display: inline-block; font-weight: 700; }
+  .reach-yes { background: rgba(22,128,60,0.12); color: var(--green); }
+  .reach-no  { background: rgba(192,57,43,0.1); color: var(--red); }
 
-  /* ── MONTH FILTER ── */
   select {
-    background: var(--surface2);
-    border: 1px solid var(--border);
+    background: var(--surface);
+    border: 1.5px solid var(--border);
     color: var(--text);
-    padding: 7px 10px;
-    border-radius: 6px;
+    padding: 8px 12px;
+    border-radius: 7px;
     font-family: 'Sarabun', sans-serif;
-    font-size: 13px;
+    font-size: 15px;
+    font-weight: 600;
     cursor: pointer;
   }
-  select:focus { outline: 1px solid var(--accent); }
+  select:focus { outline: none; border-color: var(--accent2); }
 
   .info-bar {
     background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 10px 14px;
-    font-size: 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 7px;
+    padding: 11px 16px;
+    font-size: 15px;
+    font-weight: 600;
     color: var(--text-muted);
-    margin-bottom: 14px;
+    margin-bottom: 16px;
   }
 
-  /* scrollbar */
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar { width: 7px; height: 7px; }
   ::-webkit-scrollbar-track { background: var(--bg); }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #b0bac8; }
 </style>
 </head>
 <body>
@@ -463,8 +506,9 @@
 <header>
   <div>
     <div class="logo">⚙ WORK LOG</div>
-    <div class="subtitle">Daily Job Assignment & Manpower Tracker</div>
+    <div class="subtitle">Daily Job Assignment & Manpower Tracker — Automation Dept.</div>
   </div>
+  <div class="db-status err" id="dbStatus">⏳ เชื่อมต่อ DB...</div>
 </header>
 
 <div class="tabs">
@@ -492,7 +536,7 @@
     </div>
   </div>
 
-  <!-- ── DESCRIPTION POOL ── -->
+  <!-- DESCRIPTION POOL -->
   <div class="pool-section">
     <div class="pool-header" onclick="togglePool()">
       <h4>
@@ -500,7 +544,7 @@
         📝 Description Pool
         <span class="badge-count" id="poolCount">0 รายการ</span>
       </h4>
-      <span style="font-size:11px;color:var(--text-muted)">คลิกเพื่อเปิด/ปิด — เพิ่ม Description และ JV เองได้</span>
+      <span style="font-size:12px;color:var(--text-muted);font-weight:600">คลิกเพื่อเปิด/ปิด</span>
     </div>
     <div class="pool-body" id="poolBody">
       <div class="pool-toolbar">
@@ -508,18 +552,13 @@
         <input type="text" id="newDesc" placeholder="Description">
         <input type="number" id="newCost" placeholder="Cost (บาท)" style="width:130px;flex:none">
         <button class="btn blue" onclick="addManualDesc()">➕ เพิ่ม</button>
-        <button class="btn" onclick="clearManualDesc()" style="color:var(--red)">🗑 ลบรายการ Manual ทั้งหมด</button>
+        <button class="btn danger" onclick="clearManualDesc()">🗑 ลบ Manual ทั้งหมด</button>
       </div>
       <div class="pool-table-wrap">
         <table class="pool-table">
           <thead>
             <tr>
-              <th>#</th>
-              <th>JV</th>
-              <th>Description</th>
-              <th>Cost</th>
-              <th>แหล่งที่มา</th>
-              <th></th>
+              <th>#</th><th>JV</th><th>Description</th><th>Cost</th><th>แหล่งที่มา</th><th></th>
             </tr>
           </thead>
           <tbody id="poolBody_rows"></tbody>
@@ -531,22 +570,15 @@
   <div class="toolbar">
     <label>วันที่:</label>
     <input type="date" id="pickDate">
-    <select id="pickDept">
-      <option value="">-- Dept --</option>
-      <option>Mechanical</option>
-      <option>Electrical</option>
-      <option>Civil</option>
-      <option>Instrument</option>
-      <option>Safety</option>
-    </select>
-    <label style="margin-left:4px">Description/คน:</label>
+    <label>Description/คน:</label>
     <div class="radio-group">
       <label><input type="radio" name="descPerPerson" value="1" checked><span>1 งาน/คน</span></label>
       <label><input type="radio" name="descPerPerson" value="2"><span>2 งาน/คน</span></label>
     </div>
     <button class="btn primary" onclick="addDay()">🎲 สุ่มงาน 5 คน</button>
     <button class="btn blue" onclick="addManualRow()">✏️ เพิ่มแถวเอง</button>
-    <button class="btn success" onclick="exportData()">💾 Export JSON</button>
+    <button class="btn success" onclick="saveAllToDB()">💾 บันทึกลง DB</button>
+    <button class="btn" onclick="exportData()">📤 Export JSON</button>
     <label class="btn" for="importJSON">📥 Import JSON</label>
     <input type="file" id="importJSON" accept=".json" onchange="importData(this)">
   </div>
@@ -564,15 +596,16 @@
           <th>Job Value (JV)</th>
           <th>Dept</th>
           <th>Description</th>
-          <th>Person</th>
+          <th>Person(s)</th>
           <th>EA</th>
           <th>Cost/Unit</th>
-          <th>Job Value Total / Day</th>
+          <th>JV Total</th>
+          <th>Cost Split</th>
           <th>Actions</th>
         </tr>
       </thead>
       <tbody id="logBody">
-        <tr><td colspan="12" class="empty-state">
+        <tr><td colspan="13" class="empty-state">
           <div class="icon">📊</div>
           <div>ยังไม่มีข้อมูล — โหลดไฟล์และสุ่มงาน</div>
         </td></tr>
@@ -592,25 +625,121 @@
   <div class="mp-grid" id="mpGrid"></div>
 </div>
 
-<!-- ════ SCRIPTS ════ -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
-/* ─── STATE ─── */
-let jvData      = [];   // [{JV, Cost}]           from Excel
-let descData    = [];   // [{JV, Discription}]     from Excel
-let manualDescs = [];   // [{id, JV, Discription, Cost, src:'manual'}]
-let logRows     = [];   // persisted work rows
-
+/* ─── PERSONS WITH LEVELS ─── */
 const PERSONS = [
-  { name: 'บารมี',    code: '660945'  },
-  { name: 'รัชพล',   code: '640281'  },
-  { name: 'พงศกร',   code: '11347'   },
-  { name: 'ปราโมทย์', code: '17634'   },
-  { name: 'กมล',     code: '17735638'}
+  { name: 'บารมี',    code: '660945',   level: 1 },
+  { name: 'รัชพล',   code: '640281',   level: 2 },
+  { name: 'พงศกร',   code: '11347',    level: 3 },
+  { name: 'ปราโมทย์', code: '17634',   level: 3 },
+  { name: 'กมล',     code: '17735638', level: 3 },
 ];
 
 const SP_TARGETS  = [203000, 206000, 255000, 273000, 231000];
 const MONTH_NAMES = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const DEPT_FIXED  = 'Automation';
+
+/* ─── STATE ─── */
+let jvData      = [];
+let descData    = [];
+let manualDescs = [];
+let logRows     = [];
+
+/* ─── DB API ─── */
+const API = 'http://localhost:3001/api';
+let dbConnected = false;
+
+async function checkDB(){
+  try {
+    const r = await fetch(`${API}/ping`, { signal: AbortSignal.timeout(2000) });
+    if(r.ok){ dbConnected=true; setDBStatus(true); await loadFromDB(); }
+    else setDBStatus(false);
+  } catch(e){ setDBStatus(false); loadFromLocalStorage(); }
+}
+
+function setDBStatus(ok){
+  const el = document.getElementById('dbStatus');
+  if(ok){ el.textContent='✅ DB Connected (localhost:3001)'; el.className='db-status ok'; }
+  else  { el.textContent='⚠ Offline — ใช้ LocalStorage'; el.className='db-status err'; }
+}
+
+async function loadFromDB(){
+  try {
+    const r = await fetch(`${API}/rows`);
+    const data = await r.json();
+    logRows = data || [];
+    renderTable(); renderManpower(); updateManpowerMonths();
+  } catch(e){ loadFromLocalStorage(); }
+}
+
+async function saveAllToDB(){
+  if(!dbConnected){ saveToLocalStorage(); alert('บันทึกลง LocalStorage แล้ว (Server ออฟไลน์)'); return; }
+  try {
+    const r = await fetch(`${API}/rows`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(logRows)
+    });
+    if(r.ok) alert('✅ บันทึกลง DB สำเร็จ!');
+    else alert('❌ บันทึกไม่สำเร็จ');
+  } catch(e){ saveToLocalStorage(); alert('บันทึกลง LocalStorage แล้ว'); }
+}
+
+function saveToLocalStorage(){
+  localStorage.setItem('worklog_rows', JSON.stringify(logRows));
+  localStorage.setItem('worklog_jvData', JSON.stringify(jvData));
+  localStorage.setItem('worklog_descData', JSON.stringify(descData));
+  localStorage.setItem('worklog_manualDescs', JSON.stringify(manualDescs));
+}
+
+function loadFromLocalStorage(){
+  try {
+    const rows = localStorage.getItem('worklog_rows');
+    if(rows) logRows = JSON.parse(rows);
+    const jv = localStorage.getItem('worklog_jvData');
+    if(jv) jvData = JSON.parse(jv);
+    const desc = localStorage.getItem('worklog_descData');
+    if(desc) descData = JSON.parse(desc);
+    const manual = localStorage.getItem('worklog_manualDescs');
+    if(manual) manualDescs = JSON.parse(manual);
+  } catch(e){}
+  renderTable(); renderPool(); renderManpower(); updateManpowerMonths(); updateInfo();
+}
+
+/* auto-save to localStorage on changes */
+function autoSave(){ if(!dbConnected) saveToLocalStorage(); }
+
+/* ─── COST SPLIT LOGIC ─── */
+/* Returns array of {name, pct} for persons on a row */
+function computeSplits(personNames){
+  if(!personNames || personNames.length === 0) return [];
+  if(personNames.length === 1){
+    return [{ name: personNames[0], pct: 100 }];
+  }
+  // For 2 persons: use level-based split table
+  if(personNames.length === 2){
+    const p1 = PERSONS.find(p=>p.name===personNames[0]);
+    const p2 = PERSONS.find(p=>p.name===personNames[1]);
+    const l1 = p1 ? p1.level : 3;
+    const l2 = p2 ? p2.level : 3;
+    const key = `${Math.min(l1,l2)}-${Math.max(l1,l2)}`;
+    const table = { '1-1':[50,50], '1-2':[40,60], '2-2':[50,50], '1-3':[30,70], '2-3':[40,60], '3-3':[50,50] };
+    let [pct1, pct2] = table[key] || [50,50];
+    // lower level always gets higher pct (rule: higher-level = smaller pct)
+    // if p1's level > p2's level, p1 should get smaller pct
+    if(l1 > l2){ [pct1, pct2] = [pct2, pct1]; }
+    return [{ name: personNames[0], pct: pct1 }, { name: personNames[1], pct: pct2 }];
+  }
+  // 3+ persons: equal split
+  const each = Math.round(100 / personNames.length);
+  return personNames.map((n,i)=>({ name: n, pct: i===personNames.length-1 ? 100-(each*(personNames.length-1)) : each }));
+}
+
+function splitLabel(splits, jvTotal){
+  if(splits.length <= 1) return '';
+  return splits.map(s=>`${s.name}: ${s.pct}% (${((jvTotal*s.pct)/100).toLocaleString('th-TH',{minimumFractionDigits:0})})`).join(' | ');
+}
 
 /* ─── TABS ─── */
 function switchTab(t){
@@ -622,7 +751,6 @@ function switchTab(t){
   if(t==='manpower') renderManpower();
 }
 
-/* ─── POOL TOGGLE ─── */
 function togglePool(){
   const body = document.getElementById('poolBody');
   const icon = document.getElementById('poolToggleIcon');
@@ -630,329 +758,281 @@ function togglePool(){
   icon.classList.toggle('open', open);
 }
 
-/* ─── MERGED POOL (Excel + Manual) ─── */
 function getMergedPool(){
-  const fromExcel = descData.map(d=>({
-    JV: d.JV,
-    Discription: d.Discription,
-    Cost: getCostByJV(d.JV),
-    src: 'excel'
-  }));
-  const fromManual = manualDescs.map(d=>({
-    JV: d.JV,
-    Discription: d.Discription,
-    Cost: d.Cost,
-    src: 'manual',
-    id: d.id
-  }));
+  const fromExcel = descData.map(d=>({ JV:d.JV, Discription:d.Discription, Cost:getCostByJV(d.JV), src:'excel' }));
+  const fromManual = manualDescs.map(d=>({ JV:d.JV, Discription:d.Discription, Cost:d.Cost, src:'manual', id:d.id }));
   return [...fromExcel, ...fromManual];
 }
 
-/* ─── RENDER POOL TABLE ─── */
 function renderPool(){
   const pool = getMergedPool();
   document.getElementById('poolCount').textContent = `${pool.length} รายการ`;
   const tbody = document.getElementById('poolBody_rows');
   if(pool.length===0){
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-dim)">ยังไม่มี Description — โหลด Excel หรือเพิ่มเอง</td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-dim)">ยังไม่มี Description</td></tr>`;
     return;
   }
-  tbody.innerHTML = pool.map((item, i) => `
+  tbody.innerHTML = pool.map((item,i)=>`
     <tr>
       <td style="color:var(--text-dim);font-family:'Space Mono',monospace;font-size:10px">${i+1}</td>
       <td><span class="jv-tag">${escHtml(item.JV)||'–'}</span></td>
       <td>${escHtml(item.Discription)}</td>
-      <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--green)">${item.Cost>0?item.Cost.toLocaleString():'–'}</td>
-      <td class="${item.src==='manual'?'src-manual':'src-excel'}">${item.src==='manual'?'✏ Manual':'📂 Excel'}</td>
-      <td>${item.src==='manual'
-        ? `<button class="btn danger" style="padding:2px 8px;font-size:11px" onclick="removeManual(${item.id})">🗑</button>`
-        : ''
-      }</td>
+      <td style="font-family:'Space Mono',monospace;font-size:12px;color:var(--green);font-weight:700">${item.Cost>0?item.Cost.toLocaleString():'–'}</td>
+      <td style="font-size:12px;color:var(--text-muted)">${item.src==='manual'?'✏ Manual':'📂 Excel'}</td>
+      <td>${item.src==='manual'?`<button class="btn danger" style="padding:3px 9px;font-size:12px" onclick="removeManual(${item.id})">🗑</button>`:''}</td>
     </tr>`).join('');
 }
 
-/* ─── ADD MANUAL DESC ─── */
 function addManualDesc(){
-  const jv   = document.getElementById('newJV').value.trim();
-  const desc = document.getElementById('newDesc').value.trim();
-  const cost = parseFloat(document.getElementById('newCost').value)||0;
+  const jv=document.getElementById('newJV').value.trim();
+  const desc=document.getElementById('newDesc').value.trim();
+  const cost=parseFloat(document.getElementById('newCost').value)||0;
   if(!desc){ alert('กรุณากรอก Description'); return; }
-  manualDescs.push({ id: Date.now(), JV: jv, Discription: desc, Cost: cost });
-  document.getElementById('newJV').value='';
-  document.getElementById('newDesc').value='';
-  document.getElementById('newCost').value='';
-  renderPool();
-  updateInfo();
+  manualDescs.push({ id:Date.now(), JV:jv, Discription:desc, Cost:cost });
+  document.getElementById('newJV').value=''; document.getElementById('newDesc').value=''; document.getElementById('newCost').value='';
+  renderPool(); updateInfo(); autoSave();
 }
 
 function removeManual(id){
-  manualDescs = manualDescs.filter(d=>d.id!==id);
-  renderPool();
-  updateInfo();
+  manualDescs=manualDescs.filter(d=>d.id!==id);
+  renderPool(); updateInfo(); autoSave();
 }
 
 function clearManualDesc(){
   if(!confirm('ลบรายการ Manual ทั้งหมด?')) return;
-  manualDescs = [];
-  renderPool();
-  updateInfo();
+  manualDescs=[];
+  renderPool(); updateInfo(); autoSave();
 }
 
 /* ─── FILE LOADERS ─── */
 function loadJVFile(input){
-  const file = input.files[0]; if(!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const wb = XLSX.read(e.target.result, {type:'binary'});
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const data = XLSX.utils.sheet_to_json(ws, {defval:''});
-    jvData = data.map(r=>({ JV: String(r['JV']||r['jv']||'').trim(), Cost: parseFloat(r['Cost']||r['cost']||0) })).filter(r=>r.JV);
-    document.getElementById('jvFileName').innerHTML = `<span class="status-dot ok"></span>${file.name} (${jvData.length} รายการ)`;
-    renderPool(); updateInfo();
+  const file=input.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const wb=XLSX.read(e.target.result,{type:'binary'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const data=XLSX.utils.sheet_to_json(ws,{defval:''});
+    jvData=data.map(r=>({JV:String(r['JV']||r['jv']||'').trim(),Cost:parseFloat(r['Cost']||r['cost']||0)})).filter(r=>r.JV);
+    document.getElementById('jvFileName').innerHTML=`<span class="status-dot ok"></span>${file.name} (${jvData.length} รายการ)`;
+    renderPool(); updateInfo(); autoSave();
   };
   reader.readAsBinaryString(file);
 }
 
 function loadDescFile(input){
-  const file = input.files[0]; if(!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const wb = XLSX.read(e.target.result, {type:'binary'});
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const data = XLSX.utils.sheet_to_json(ws, {defval:''});
-    descData = data.map(r=>({ JV: String(r['JV']||r['jv']||'').trim(), Discription: String(r['Discription']||r['Description']||r['description']||'').trim() })).filter(r=>r.Discription);
-    document.getElementById('descFileName').innerHTML = `<span class="status-dot ok"></span>${file.name} (${descData.length} รายการ)`;
-    renderPool(); updateInfo();
+  const file=input.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const wb=XLSX.read(e.target.result,{type:'binary'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const data=XLSX.utils.sheet_to_json(ws,{defval:''});
+    descData=data.map(r=>({JV:String(r['JV']||r['jv']||'').trim(),Discription:String(r['Discription']||r['Description']||r['description']||'').trim()})).filter(r=>r.Discription);
+    document.getElementById('descFileName').innerHTML=`<span class="status-dot ok"></span>${file.name} (${descData.length} รายการ)`;
+    renderPool(); updateInfo(); autoSave();
   };
   reader.readAsBinaryString(file);
 }
 
 function updateInfo(){
-  const pool = getMergedPool();
-  const ok = pool.length > 0;
-  document.getElementById('infoBar').textContent = ok
-    ? `✅ Pool พร้อมใช้งาน — รวม ${pool.length} รายการ (Excel: ${descData.length} | Manual: ${manualDescs.length})`
-    : `⚠ โหลดไฟล์ Excel หรือเพิ่ม Description ด้วยตัวเองก่อน`;
+  const pool=getMergedPool();
+  const ok=pool.length>0;
+  document.getElementById('infoBar').textContent=ok
+    ?`✅ Pool พร้อมใช้งาน — รวม ${pool.length} รายการ (Excel: ${descData.length} | Manual: ${manualDescs.length})`
+    :`⚠ โหลดไฟล์ Excel หรือเพิ่ม Description ด้วยตัวเองก่อน`;
 }
 
 /* ─── ADD DAY ─── */
 function addDay(){
-  const pool = getMergedPool();
-  if(pool.length===0){ alert('ยังไม่มี Description ใน Pool กรุณาโหลดไฟล์หรือเพิ่มเอง'); return; }
-  const dateVal = document.getElementById('pickDate').value;
+  const pool=getMergedPool();
+  if(pool.length===0){ alert('ยังไม่มี Description ใน Pool'); return; }
+  const dateVal=document.getElementById('pickDate').value;
   if(!dateVal){ alert('กรุณาเลือกวันที่'); return; }
-  const dept = document.getElementById('pickDept').value;
-  const descPerPerson = parseInt(document.querySelector('input[name="descPerPerson"]:checked').value);
-
-  const totalNeeded = 5 * descPerPerson;
-  // shuffle pool
-  const shuffled = [...pool].sort(()=>Math.random()-0.5);
-  // pick without repeat (cycle if pool smaller than needed)
-  const picked = [];
-  for(let i=0; i<totalNeeded; i++) picked.push(shuffled[i % shuffled.length]);
-
-  const dateObj = new Date(dateVal);
-  const dayNames = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัส','ศุกร์','เสาร์'];
-  const dayName = dayNames[dateObj.getDay()];
-
-  PERSONS.forEach((person, pIdx) => {
-    for(let d=0; d<descPerPerson; d++){
-      const item = picked[pIdx*descPerPerson + d];
+  const descPerPerson=parseInt(document.querySelector('input[name="descPerPerson"]:checked').value);
+  const totalNeeded=5*descPerPerson;
+  const shuffled=[...pool].sort(()=>Math.random()-0.5);
+  const picked=[];
+  for(let i=0;i<totalNeeded;i++) picked.push(shuffled[i%shuffled.length]);
+  const dateObj=new Date(dateVal);
+  const dayNames=['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัส','ศุกร์','เสาร์'];
+  const dayName=dayNames[dateObj.getDay()];
+  PERSONS.forEach((person,pIdx)=>{
+    for(let d=0;d<descPerPerson;d++){
+      const item=picked[pIdx*descPerPerson+d];
       logRows.push({
-        id: Date.now() + pIdx*10 + d,
-        date: dateVal,
-        dayName,
-        dept,
-        jv: item.JV||'',
-        description: item.Discription,
-        personName: person.name,
-        personCode: person.code,
-        workOrder: '',
-        ea: '',
-        cost: item.Cost||0,
-        total: 0
+        id:Date.now()+pIdx*10+d, date:dateVal, dayName, dept:DEPT_FIXED,
+        jv:item.JV||'', description:item.Discription,
+        persons:[person.name], workOrder:'', ea:'', cost:item.Cost||0, total:0
       });
     }
   });
-
-  renderTable();
-  updateManpowerMonths();
+  renderTable(); updateManpowerMonths(); autoSave();
 }
 
 function getCostByJV(jv){
-  // check manual first, then excel jvData
-  const manual = manualDescs.find(d=>d.JV===jv);
+  const manual=manualDescs.find(d=>d.JV===jv);
   if(manual) return manual.Cost;
-  const found = jvData.find(r=>r.JV===jv);
-  return found ? found.Cost : 0;
+  const found=jvData.find(r=>r.JV===jv);
+  return found?found.Cost:0;
 }
 
 /* ─── ADD MANUAL ROW ─── */
 function addManualRow(){
-  const dateVal = document.getElementById('pickDate').value || new Date().toISOString().slice(0,10);
-  const dept    = document.getElementById('pickDept').value;
-  const dateObj = new Date(dateVal);
-  const dayNames= ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัส','ศุกร์','เสาร์'];
+  const dateVal=document.getElementById('pickDate').value||new Date().toISOString().slice(0,10);
+  const dateObj=new Date(dateVal);
+  const dayNames=['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัส','ศุกร์','เสาร์'];
   logRows.push({
-    id: Date.now(),
-    date: dateVal,
-    dayName: dayNames[dateObj.getDay()],
-    dept,
-    jv: '',
-    description: '',
-    personName: '',
-    personCode: '',
-    workOrder: '',
-    ea: '',
-    cost: 0,
-    total: 0,
-    manual: true
+    id:Date.now(), date:dateVal, dayName:dayNames[dateObj.getDay()],
+    dept:DEPT_FIXED, jv:'', description:'', persons:[], workOrder:'', ea:'', cost:0, total:0, manual:true
   });
   renderTable();
-  // scroll to bottom
   setTimeout(()=>{ const w=document.querySelector('.table-wrap'); if(w) w.scrollTop=w.scrollHeight; },50);
 }
 
 /* ─── RENDER TABLE ─── */
 function renderTable(){
-  const tbody = document.getElementById('logBody');
+  const tbody=document.getElementById('logBody');
   if(logRows.length===0){
-    tbody.innerHTML = `<tr><td colspan="12" class="empty-state"><div class="icon">📊</div><div>ยังไม่มีข้อมูล — กด "สุ่มงาน" หรือ "เพิ่มแถวเอง"</div></td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="13" class="empty-state"><div class="icon">📊</div><div>ยังไม่มีข้อมูล — กด "สุ่มงาน" หรือ "เพิ่มแถวเอง"</div></td></tr>`;
     return;
   }
 
-  // build person options for select
-  const personOpts = ['', ...PERSONS.map(p=>p.name)].map(n=>
-    `<option value="${n}">${n||'-- เลือกคน --'}</option>`).join('');
+  tbody.innerHTML=logRows.map((row,idx)=>{
+    const ea=parseFloat(row.ea)||0;
+    const cost=row.cost||0;
+    const jvTotal=ea*cost;
+    row.total=jvTotal;
+    const totalStr=jvTotal>0?jvTotal.toLocaleString('th-TH',{minimumFractionDigits:2}):'';
+    const isManual=!!row.manual;
 
-  tbody.innerHTML = logRows.map((row, idx) => {
-    const total = (parseFloat(row.ea)||0) * (row.cost||0);
-    row.total = total;
-    const totalStr = total > 0 ? total.toLocaleString('th-TH',{minimumFractionDigits:2}) : '';
-    const isManual = !!row.manual;
+    // ensure persons is array
+    if(!Array.isArray(row.persons)) row.persons = row.persons ? [row.persons] : [];
 
-    // JV cell: manual rows show input, auto rows show tag
-    const jvCell = isManual
-      ? `<input type="text" value="${escHtml(row.jv)}" placeholder="JV-XXX"
-             onchange="updateJV(${idx},this.value)" style="width:90px">`
-      : `<span class="jv-tag">${escHtml(row.jv)||'–'}</span>`;
+    // JV cell
+    const jvCell=isManual
+      ?`<input type="text" value="${escHtml(row.jv)}" placeholder="JV-XXX" onchange="updateJV(${idx},this.value)" style="width:90px">`
+      :`<span class="jv-tag">${escHtml(row.jv)||'–'}</span>`;
 
-    // Description cell: manual = textarea-like input, auto = text
-    const descCell = isManual
-      ? `<input type="text" value="${escHtml(row.description)}" placeholder="กรอก Description"
-             onchange="logRows[${idx}].description=this.value" style="min-width:180px">`
-      : `<span style="max-width:240px;white-space:normal;display:block">${escHtml(row.description)}</span>`;
+    // Desc cell
+    const descCell=isManual
+      ?`<input type="text" value="${escHtml(row.description)}" placeholder="กรอก Description" onchange="logRows[${idx}].description=this.value;autoSave()" style="min-width:180px">`
+      :`<span style="max-width:220px;white-space:normal;display:block;font-size:14px">${escHtml(row.description)}</span>`;
 
-    // Dept cell: always editable select
-    const deptOpts = ['','Mechanical','Electrical','Civil','Instrument','Safety']
-      .map(d=>`<option value="${d}" ${row.dept===d?'selected':''}>${d||'-- Dept --'}</option>`).join('');
-    const deptCell = `<select onchange="logRows[${idx}].dept=this.value" style="background:transparent;border:1px solid transparent;color:var(--text-muted);font-size:12px;padding:2px 4px;border-radius:4px;cursor:pointer" onfocus="this.style.borderColor='var(--accent2)'" onblur="this.style.borderColor='transparent'">${deptOpts}</select>`;
+    // Person cell — multi-select chips for manual, chips for auto
+    const personCell=isManual
+      ? buildPersonMultiSelect(idx, row.persons)
+      : `<div style="display:flex;flex-wrap:wrap;gap:3px">${row.persons.map(n=>{
+          const p=PERSONS.find(x=>x.name===n);
+          const lv=p?p.level:3;
+          return `<span class="person-chip">👤 ${escHtml(n)}<span class="level-badge lvl${lv}">L${lv}</span></span>`;
+        }).join('')}</div>`;
 
-    // Person cell: manual = dropdown, auto = chip
-    const personCell = isManual
-      ? `<select onchange="updatePerson(${idx},this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:12px;padding:4px 6px;border-radius:6px;cursor:pointer">
-           ${['','บารมี','รัชพล','พงศกร','ปราโมทย์','กมล'].map(n=>`<option value="${n}" ${row.personName===n?'selected':''}>${n||'-- เลือกคน --'}</option>`).join('')}
-         </select>`
-      : `<span class="person-chip">👤 ${escHtml(row.personName)}<br><span style="font-size:10px;opacity:.7">${row.personCode}</span></span>`;
+    // Cost cell
+    const costCell=isManual
+      ?`<input type="number" min="0" value="${cost||''}" placeholder="0" onchange="updateCost(${idx},this.value)" style="width:80px;text-align:right">`
+      :`<span style="font-family:'Space Mono',monospace;font-size:12px;color:var(--text-muted);font-weight:700">${cost>0?cost.toLocaleString():'–'}</span>`;
 
-    // Cost cell: manual = editable, auto = readonly
-    const costCell = isManual
-      ? `<input type="number" min="0" value="${row.cost||''}" placeholder="0"
-             onchange="updateCost(${idx},this.value)" style="width:80px;text-align:right">`
-      : `<span style="font-family:'Space Mono',monospace;font-size:11px;color:var(--text-muted)">${row.cost>0?row.cost.toLocaleString():'–'}</span>`;
+    // Split info
+    const splits=computeSplits(row.persons);
+    const splitStr=row.persons.length>1?splitLabel(splits,jvTotal):'';
 
-    const manualMark = isManual
-      ? `<span style="font-size:9px;color:var(--accent2);display:block;text-align:center;margin-top:2px">✏ Manual</span>` : '';
+    const manualMark=isManual?`<span style="font-size:10px;color:var(--accent2);display:block;text-align:center;margin-top:2px;font-weight:700">✏ Manual</span>`:'';
 
     return `
-    <tr style="${isManual?'background:rgba(88,166,255,0.04)':''}">
-      <td style="color:var(--text-dim);font-family:'Space Mono',monospace;font-size:11px">${idx+1}${manualMark}</td>
+    <tr style="${isManual?'background:rgba(29,111,206,0.03)':''}">
+      <td style="color:var(--text-dim);font-family:'Space Mono',monospace;font-size:12px;font-weight:700">${idx+1}${manualMark}</td>
       <td><span class="day-badge">${row.dayName}</span></td>
       <td><span class="date-badge">${row.date}</span></td>
-      <td><input type="text" value="${escHtml(row.workOrder)}" placeholder="WO-XXXX"
-           onchange="logRows[${idx}].workOrder=this.value"></td>
+      <td><input type="text" value="${escHtml(row.workOrder)}" placeholder="WO-XXXX" onchange="logRows[${idx}].workOrder=this.value;autoSave()"></td>
       <td>${jvCell}</td>
-      <td>${deptCell}</td>
+      <td><span style="font-size:13px;font-weight:700;color:var(--accent2)">${DEPT_FIXED}</span></td>
       <td>${descCell}</td>
       <td>${personCell}</td>
-      <td><input type="number" min="0" value="${row.ea||''}" placeholder="0"
-           onchange="updateEA(${idx},this.value)" style="width:60px;text-align:right"></td>
+      <td><input type="number" min="0" value="${row.ea||''}" placeholder="0" onchange="updateEA(${idx},this.value)" style="width:60px;text-align:right"></td>
       <td>${costCell}</td>
       <td class="total-cell">${totalStr||'–'}</td>
-      <td><button class="btn danger" style="padding:4px 8px;font-size:11px" onclick="deleteRow(${idx})">🗑</button></td>
+      <td><span class="split-info">${escHtml(splitStr)}</span></td>
+      <td><button class="btn danger" style="padding:5px 10px;font-size:13px" onclick="deleteRow(${idx})">🗑</button></td>
     </tr>`;
   }).join('');
 }
 
-function updateJV(idx, val){
-  logRows[idx].jv = val.trim();
-  // auto-fill cost from pool if JV matches
-  const cost = getCostByJV(val.trim());
-  if(cost) { logRows[idx].cost = cost; }
-  logRows[idx].total = (parseFloat(logRows[idx].ea)||0) * (logRows[idx].cost||0);
-  renderTable();
-  renderManpower();
+function buildPersonMultiSelect(idx, selected){
+  return `<div class="person-multiselect">${PERSONS.map(p=>{
+    const isSel=selected.includes(p.name);
+    return `<span class="person-toggle ${isSel?'selected':''}" onclick="togglePerson(${idx},'${p.name}')">${p.name}<span class="level-badge lvl${p.level}">L${p.level}</span></span>`;
+  }).join('')}</div>`;
 }
 
-function updatePerson(idx, name){
-  logRows[idx].personName = name;
-  const p = PERSONS.find(p=>p.name===name);
-  logRows[idx].personCode = p ? p.code : '';
-  renderTable();
-  renderManpower();
+function togglePerson(idx, name){
+  const row=logRows[idx];
+  if(!Array.isArray(row.persons)) row.persons=[];
+  if(row.persons.includes(name)) row.persons=row.persons.filter(n=>n!==name);
+  else row.persons.push(name);
+  renderTable(); renderManpower(); autoSave();
 }
 
-function updateCost(idx, val){
-  logRows[idx].cost = parseFloat(val)||0;
-  logRows[idx].total = (parseFloat(logRows[idx].ea)||0) * logRows[idx].cost;
-  renderTable();
-  renderManpower();
+function updateJV(idx,val){
+  logRows[idx].jv=val.trim();
+  const cost=getCostByJV(val.trim());
+  if(cost) logRows[idx].cost=cost;
+  logRows[idx].total=(parseFloat(logRows[idx].ea)||0)*(logRows[idx].cost||0);
+  renderTable(); renderManpower(); autoSave();
 }
 
-function updateEA(idx, val){
-  logRows[idx].ea = parseFloat(val)||0;
-  logRows[idx].total = logRows[idx].ea * (logRows[idx].cost||0);
-  renderTable();
-  renderManpower();
+function updateCost(idx,val){
+  logRows[idx].cost=parseFloat(val)||0;
+  logRows[idx].total=(parseFloat(logRows[idx].ea)||0)*logRows[idx].cost;
+  renderTable(); renderManpower(); autoSave();
+}
+
+function updateEA(idx,val){
+  logRows[idx].ea=parseFloat(val)||0;
+  logRows[idx].total=logRows[idx].ea*(logRows[idx].cost||0);
+  renderTable(); renderManpower(); autoSave();
 }
 
 function deleteRow(idx){
   if(!confirm('ลบแถวนี้?')) return;
   logRows.splice(idx,1);
-  renderTable();
-  renderManpower();
+  renderTable(); renderManpower(); autoSave();
 }
 
 /* ─── MANPOWER ─── */
 function updateManpowerMonths(){
-  const months = [...new Set(logRows.map(r=>r.date.slice(0,7)))].sort();
-  const sel = document.getElementById('filterMonth');
-  const cur = sel.value;
-  sel.innerHTML = '<option value="">-- ทุกเดือน --</option>';
+  const months=[...new Set(logRows.map(r=>r.date.slice(0,7)))].sort();
+  const sel=document.getElementById('filterMonth');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">-- ทุกเดือน --</option>';
   months.forEach(m=>{
-    const [y,mo] = m.split('-');
-    sel.innerHTML += `<option value="${m}" ${m===cur?'selected':''}>${MONTH_NAMES[parseInt(mo)-1]} ${parseInt(y)+543}</option>`;
+    const [y,mo]=m.split('-');
+    sel.innerHTML+=`<option value="${m}" ${m===cur?'selected':''}>${MONTH_NAMES[parseInt(mo)-1]} ${parseInt(y)+543}</option>`;
   });
 }
 
 function renderManpower(){
   updateManpowerMonths();
-  const filterM = document.getElementById('filterMonth').value;
-  let months = [...new Set(logRows.map(r=>r.date.slice(0,7)))].sort();
-  if(filterM) months = [filterM];
-  if(months.length===0) months = [new Date().toISOString().slice(0,7)];
+  const filterM=document.getElementById('filterMonth').value;
+  let months=[...new Set(logRows.map(r=>r.date.slice(0,7)))].sort();
+  if(filterM) months=[filterM];
+  if(months.length===0) months=[new Date().toISOString().slice(0,7)];
 
-  const grid = document.getElementById('mpGrid');
-  grid.innerHTML = PERSONS.map((p, pIdx) => {
-    const spTarget = SP_TARGETS[pIdx];
-    const monthBlocks = months.map(m => {
-      const [y, mo] = m.split('-');
-      const monthRows = logRows.filter(r=>r.date.startsWith(m) && r.personName===p.name);
-      const pv = monthRows.reduce((s,r)=>s+(parseFloat(r.total)||0), 0);
-      const pct = spTarget > 0 ? Math.min(pv/spTarget*100, 100) : 0;
-      const reached = pv >= spTarget;
-      const fillClass = pct >= 100 ? '' : pct >= 60 ? 'warn' : 'danger';
-      const label = `${MONTH_NAMES[parseInt(mo)-1]} ${parseInt(y)+543}`;
+  const grid=document.getElementById('mpGrid');
+  grid.innerHTML=PERSONS.map((p,pIdx)=>{
+    const spTarget=SP_TARGETS[pIdx];
+    const monthBlocks=months.map(m=>{
+      const [y,mo]=m.split('-');
+      // sum rows where this person is assigned — using their split share
+      const monthRows=logRows.filter(r=>r.date.startsWith(m)&&Array.isArray(r.persons)&&r.persons.includes(p.name));
+      let pv=0;
+      monthRows.forEach(r=>{
+        const splits=computeSplits(r.persons);
+        const mySplit=splits.find(s=>s.name===p.name);
+        if(mySplit) pv+=(r.total||0)*(mySplit.pct/100);
+      });
+      const pct=spTarget>0?Math.min(pv/spTarget*100,100):0;
+      const reached=pv>=spTarget;
+      const fillClass=pct>=100?'':pct>=60?'warn':'danger';
+      const label=`${MONTH_NAMES[parseInt(mo)-1]} ${parseInt(y)+543}`;
       return `
       <div class="mp-month">
         <div class="m-label">${label}</div>
@@ -962,10 +1042,12 @@ function renderManpower(){
         <span class="reach-badge ${reached?'reach-yes':'reach-no'}">${reached?'✅ ถึง SP':'❌ ยังไม่ถึง'}</span>
       </div>`;
     }).join('');
+    const lvlClass=`lvl${p.level}`;
     return `
     <div class="mp-card">
       <div class="emp-name">${p.name}</div>
       <div class="emp-code"># ${p.code}</div>
+      <div class="emp-level"><span class="level-badge ${lvlClass}" style="font-size:13px;padding:2px 8px">Level ${p.level}</span></div>
       <div class="mp-month-grid">${monthBlocks}</div>
     </div>`;
   }).join('');
@@ -973,27 +1055,28 @@ function renderManpower(){
 
 /* ─── EXPORT / IMPORT ─── */
 function exportData(){
-  const blob = new Blob([JSON.stringify({logRows, jvData, descData, manualDescs},null,2)],{type:'application/json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `worklog_${new Date().toISOString().slice(0,10)}.json`;
+  const blob=new Blob([JSON.stringify({logRows,jvData,descData,manualDescs},null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`worklog_${new Date().toISOString().slice(0,10)}.json`;
   a.click();
 }
 
 function importData(input){
-  const file = input.files[0]; if(!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
+  const file=input.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
     try{
-      const obj = JSON.parse(e.target.result);
-      if(obj.logRows)     logRows     = obj.logRows;
-      if(obj.jvData)      jvData      = obj.jvData;
-      if(obj.descData)    descData    = obj.descData;
-      if(obj.manualDescs) manualDescs = obj.manualDescs;
+      const obj=JSON.parse(e.target.result);
+      if(obj.logRows) logRows=obj.logRows;
+      if(obj.jvData) jvData=obj.jvData;
+      if(obj.descData) descData=obj.descData;
+      if(obj.manualDescs) manualDescs=obj.manualDescs;
       renderTable(); renderPool(); renderManpower();
-      document.getElementById('jvFileName').innerHTML  = `<span class="status-dot ok"></span>โหลดจาก JSON (${jvData.length} รายการ)`;
-      document.getElementById('descFileName').innerHTML= `<span class="status-dot ok"></span>โหลดจาก JSON (${descData.length} รายการ)`;
+      document.getElementById('jvFileName').innerHTML=`<span class="status-dot ok"></span>โหลดจาก JSON (${jvData.length} รายการ)`;
+      document.getElementById('descFileName').innerHTML=`<span class="status-dot ok"></span>โหลดจาก JSON (${descData.length} รายการ)`;
       updateInfo();
+      autoSave();
       alert('นำเข้าข้อมูลสำเร็จ!');
     }catch(err){ alert('ไฟล์ JSON ไม่ถูกต้อง: '+err.message); }
   };
@@ -1003,9 +1086,10 @@ function importData(input){
 function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 /* ─── INIT ─── */
-document.getElementById('pickDate').value = new Date().toISOString().slice(0,10);
+document.getElementById('pickDate').value=new Date().toISOString().slice(0,10);
 renderPool();
 renderManpower();
+checkDB();
 </script>
 </body>
 </html>
