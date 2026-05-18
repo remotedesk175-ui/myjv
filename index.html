@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Work Log SystemV2</title>
+<title>Work Log System</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -495,6 +495,37 @@
     margin-bottom: 16px;
   }
 
+  /* SHIFT TABLE */
+  .shift-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .shift-table th {
+    background: var(--surface2);
+    color: var(--accent);
+    font-family: 'Space Mono', monospace;
+    font-size:10px; text-transform:uppercase;
+    padding:9px 8px; border-bottom:2px solid var(--border);
+    white-space:nowrap; position:sticky; top:0; text-align:center;
+    font-weight:700;
+  }
+  .shift-table th.name-col { text-align:left; min-width:110px; }
+  .shift-table tbody tr { border-bottom:1px solid var(--border); }
+  .shift-table tbody tr:hover { background:#f0f4ff; }
+  .shift-table td { padding:7px 6px; text-align:center; vertical-align:middle; font-weight:600; }
+  .shift-table td.name-col { text-align:left; font-size:14px; font-weight:700; color:var(--text); }
+  .shift-cell-work { color:var(--green); font-size:13px; }
+  .shift-cell-off {
+    background:rgba(192,57,43,0.1); color:var(--red);
+    border-radius:4px; font-size:11px; font-weight:700; padding:2px 5px;
+  }
+  .shift-cell-nodata { color:var(--text-dim); font-size:11px; }
+  .off-warning {
+    display:inline-block;
+    background:rgba(192,57,43,0.12);
+    border:1px solid rgba(192,57,43,0.3);
+    border-radius:4px; padding:1px 7px;
+    font-size:11px; font-weight:700; color:var(--red);
+    margin-left:4px;
+  }
+
   ::-webkit-scrollbar { width: 7px; height: 7px; }
   ::-webkit-scrollbar-track { background: var(--bg); }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
@@ -514,6 +545,7 @@
 <div class="tabs">
   <button class="tab-btn active" onclick="switchTab('log')">📋 Daily Log</button>
   <button class="tab-btn" onclick="switchTab('manpower')">👥 Manpower</button>
+  <button class="tab-btn" onclick="switchTab('shift')">📅 ตารางกะ</button>
 </div>
 
 <!-- ═══════════════ TAB: DAILY LOG ═══════════════ -->
@@ -533,6 +565,14 @@
       <label class="btn" for="fileDesc">⬆ Upload Excel (.xlsx)</label>
       <input type="file" id="fileDesc" accept=".xlsx,.xls" onchange="loadDescFile(this)">
       <div class="file-name" id="descFileName"><span class="status-dot" id="dotDesc"></span>ยังไม่ได้โหลด</div>
+    </div>
+    <div class="import-card">
+      <h4>📅 FILE: ตารางกะ (วันหยุด)</h4>
+      <p>Columns: <strong>Name</strong> (ชื่อคน) + คอลัมน์วันที่ เช่น <strong>2025-06-01</strong> หรือ <strong>01/06/2025</strong> — ค่าในช่องคือ <em>OFF / หยุด / 0</em> หรือเว้นว่างหากทำงาน</p>
+      <label class="btn" for="fileShift">⬆ Upload Excel (.xlsx)</label>
+      <input type="file" id="fileShift" accept=".xlsx,.xls" onchange="loadShiftFile(this)">
+      <div class="file-name" id="shiftFileName"><span class="status-dot" id="dotShift"></span>ยังไม่ได้โหลด</div>
+      <div id="shiftPreview" style="margin-top:8px;font-size:12px;color:var(--text-muted)"></div>
     </div>
   </div>
 
@@ -625,7 +665,19 @@
   <div class="mp-grid" id="mpGrid"></div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- ═══════════════ TAB: SHIFT SCHEDULE ═══════════════ -->
+<div id="tab-shift" class="tab-content">
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;flex-wrap:wrap">
+    <label style="color:var(--text-muted);font-size:15px;font-weight:600">กรองเดือน:</label>
+    <select id="shiftFilterMonth" onchange="renderShiftTab()">
+      <option value="">-- ทุกเดือน --</option>
+    </select>
+    <span id="shiftSummary" style="font-size:13px;font-weight:600;color:var(--text-muted)"></span>
+  </div>
+  <div id="shiftTable" style="overflow-x:auto"></div>
+</div>
+
+
 <script>
 /* ─── PERSONS WITH LEVELS ─── */
 const PERSONS = [
@@ -645,6 +697,8 @@ let jvData      = [];
 let descData    = [];
 let manualDescs = [];
 let logRows     = [];
+/* shiftData: { personName: Set<"YYYY-MM-DD"> } — days OFF for each person */
+let shiftData   = {};
 
 /* ─── DB API ─── */
 const API = 'http://localhost:3001/api';
@@ -691,6 +745,10 @@ function saveToLocalStorage(){
   localStorage.setItem('worklog_jvData', JSON.stringify(jvData));
   localStorage.setItem('worklog_descData', JSON.stringify(descData));
   localStorage.setItem('worklog_manualDescs', JSON.stringify(manualDescs));
+  // Convert Sets to arrays for JSON serialization
+  const shiftSerial={};
+  Object.entries(shiftData).forEach(([k,v])=>{ shiftSerial[k]=[...v]; });
+  localStorage.setItem('worklog_shiftData', JSON.stringify(shiftSerial));
 }
 
 function loadFromLocalStorage(){
@@ -703,8 +761,15 @@ function loadFromLocalStorage(){
     if(desc) descData = JSON.parse(desc);
     const manual = localStorage.getItem('worklog_manualDescs');
     if(manual) manualDescs = JSON.parse(manual);
+    const shift = localStorage.getItem('worklog_shiftData');
+    if(shift){
+      const parsed=JSON.parse(shift);
+      shiftData={};
+      Object.entries(parsed).forEach(([k,v])=>{ shiftData[k]=new Set(v); });
+    }
   } catch(e){}
-  renderTable(); renderPool(); renderManpower(); updateManpowerMonths(); updateInfo();
+  renderTable(); renderPool(); renderManpower(); updateManpowerMonths();
+  updateShiftFilterMonths(); updateInfo();
 }
 
 /* auto-save to localStorage on changes */
@@ -743,12 +808,14 @@ function splitLabel(splits, jvTotal){
 
 /* ─── TABS ─── */
 function switchTab(t){
+  const tabNames=['log','manpower','shift'];
   document.querySelectorAll('.tab-btn').forEach((b,i)=>{
-    b.classList.toggle('active', ['log','manpower'][i]===t);
+    b.classList.toggle('active', tabNames[i]===t);
   });
   document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
   document.getElementById('tab-'+t).classList.add('active');
   if(t==='manpower') renderManpower();
+  if(t==='shift') renderShiftTab();
 }
 
 function togglePool(){
@@ -833,6 +900,113 @@ function loadDescFile(input){
   reader.readAsBinaryString(file);
 }
 
+/* ─── SHIFT FILE LOADER ─── */
+/*
+ * รูปแบบ Excel ตารางกะ:
+ *   Row 1 (header): Name | 2025-06-01 | 2025-06-02 | ...
+ *   Rows: ชื่อคน | ค่า (ถ้า OFF/หยุด/0/WD/off = วันหยุด, ว่าง/W/work = ทำงาน)
+ *
+ * รองรับหลายรูปแบบวันที่ในหัวคอลัมน์:
+ *   YYYY-MM-DD, DD/MM/YYYY, MM/DD/YYYY, Excel serial number
+ */
+function loadShiftFile(input){
+  const file=input.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary',cellDates:true});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      // Get raw with header:1 to access header row
+      const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      if(raw.length<2){ alert('ไฟล์ตารางกะต้องมีอย่างน้อย 2 แถว (header + ข้อมูล)'); return; }
+
+      const headers=raw[0];
+      // Parse date columns
+      const dateCols=[]; // [{colIdx, dateStr "YYYY-MM-DD"}]
+      for(let c=1;c<headers.length;c++){
+        const h=headers[c];
+        const d=parseHeaderDate(h);
+        if(d) dateCols.push({colIdx:c, dateStr:d});
+      }
+
+      shiftData={};
+      let totalOff=0;
+      for(let r=1;r<raw.length;r++){
+        const row=raw[r];
+        const nameRaw=String(row[0]||'').trim();
+        if(!nameRaw) continue;
+        // match person by name (partial or full)
+        const person=PERSONS.find(p=>nameRaw.includes(p.name)||p.name.includes(nameRaw));
+        const key=person?person.name:nameRaw;
+        if(!shiftData[key]) shiftData[key]=new Set();
+        dateCols.forEach(({colIdx,dateStr})=>{
+          const val=String(row[colIdx]||'').trim().toLowerCase();
+          if(isOffValue(val)){
+            shiftData[key].add(dateStr);
+            totalOff++;
+          }
+        });
+      }
+
+      const personCount=Object.keys(shiftData).length;
+      document.getElementById('shiftFileName').innerHTML=
+        `<span class="status-dot ok"></span>${file.name} (${personCount} คน, ${dateCols.length} วัน)`;
+      document.getElementById('shiftPreview').innerHTML=
+        `พบวันหยุดรวม <strong>${totalOff}</strong> รายการ | ` +
+        Object.entries(shiftData).map(([n,s])=>`${n}: ${s.size} วัน`).join(' | ');
+
+      updateShiftFilterMonths();
+      renderShiftTab();
+      autoSave();
+    }catch(err){ alert('โหลดไฟล์ตารางกะไม่สำเร็จ: '+err.message); console.error(err); }
+  };
+  reader.readAsBinaryString(file);
+}
+
+/* Parse date from Excel header cell — returns "YYYY-MM-DD" or null */
+function parseHeaderDate(h){
+  if(!h && h!==0) return null;
+  // Excel serial number (number)
+  if(typeof h==='number'){
+    const d=XLSX.SSF.parse_date_code(h);
+    if(d) return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+  }
+  if(h instanceof Date){
+    return h.toISOString().slice(0,10);
+  }
+  const s=String(h).trim();
+  // YYYY-MM-DD
+  if(/^\d{4}-\d{1,2}-\d{1,2}$/.test(s)){
+    const [y,m,d]=s.split('-');
+    return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+  }
+  // DD/MM/YYYY or MM/DD/YYYY
+  if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)){
+    const [a,b,y]=s.split('/');
+    // assume DD/MM/YYYY (Thai convention)
+    return `${y}-${b.padStart(2,'0')}-${a.padStart(2,'0')}`;
+  }
+  // D-M-YYYY
+  if(/^\d{1,2}-\d{1,2}-\d{4}$/.test(s)){
+    const [d,m,y]=s.split('-');
+    return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+  }
+  return null;
+}
+
+/* Returns true if cell value means "day off" */
+function isOffValue(val){
+  if(val===''||val==='w'||val==='work'||val==='ทำงาน'||val==='1') return false;
+  // off markers
+  return ['off','หยุด','0','wd','x','วันหยุด','leave','lv','ลา'].includes(val) || val.startsWith('off') || val.startsWith('หยุด');
+}
+
+/* Check if person has day off on given date */
+function isPersonOff(personName, dateStr){
+  if(!shiftData[personName]) return false;
+  return shiftData[personName].has(dateStr);
+}
+
 function updateInfo(){
   const pool=getMergedPool();
   const ok=pool.length>0;
@@ -847,25 +1021,65 @@ function addDay(){
   if(pool.length===0){ alert('ยังไม่มี Description ใน Pool'); return; }
   const dateVal=document.getElementById('pickDate').value;
   if(!dateVal){ alert('กรุณาเลือกวันที่'); return; }
+
+  // Filter pool: ตัด JV ที่มี Cost <= 10,000 ออก (ไม่สุ่มให้)
+  const validPool=pool.filter(item=>(item.Cost||0)>10000);
+  if(validPool.length===0){
+    alert('ไม่มี JV ที่มี Cost > 10,000 ใน Pool กรุณาตรวจสอบข้อมูล');
+    return;
+  }
+
   const descPerPerson=parseInt(document.querySelector('input[name="descPerPerson"]:checked').value);
-  const totalNeeded=5*descPerPerson;
-  const shuffled=[...pool].sort(()=>Math.random()-0.5);
-  const picked=[];
-  for(let i=0;i<totalNeeded;i++) picked.push(shuffled[i%shuffled.length]);
   const dateObj=new Date(dateVal);
   const dayNames=['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัส','ศุกร์','เสาร์'];
   const dayName=dayNames[dateObj.getDay()];
-  PERSONS.forEach((person,pIdx)=>{
+
+  // ตรวจสอบวันหยุด — รวบรวมรายชื่อคนที่ไม่หยุด
+  const activePersons=PERSONS.filter(p=>!isPersonOff(p.name,dateVal));
+  const offPersons=PERSONS.filter(p=>isPersonOff(p.name,dateVal));
+
+  if(activePersons.length===0){
+    alert(`วันที่ ${dateVal} ทุกคนหยุด ไม่สามารถสุ่มงานได้`);
+    return;
+  }
+
+  if(offPersons.length>0){
+    const names=offPersons.map(p=>p.name).join(', ');
+    const proceed=confirm(`⚠ วันที่ ${dateVal} มีคนหยุด: ${names}\nจะสุ่มงานให้เฉพาะ ${activePersons.length} คนที่ทำงาน ใช่ไหม?`);
+    if(!proceed) return;
+  }
+
+  const totalNeeded=activePersons.length*descPerPerson;
+  const shuffled=[...validPool].sort(()=>Math.random()-0.5);
+  const picked=[];
+  for(let i=0;i<totalNeeded;i++) picked.push(shuffled[i%shuffled.length]);
+
+  activePersons.forEach((person,pIdx)=>{
     for(let d=0;d<descPerPerson;d++){
       const item=picked[pIdx*descPerPerson+d];
+      const cost=item.Cost||0;
+      // EA อัตโนมัติ: ceil(SP_Target / cost) แต่ cost ต้องมีค่า
+      const spIdx=PERSONS.findIndex(p=>p.name===person.name);
+      const spTarget=spIdx>=0?SP_TARGETS[spIdx]:0;
+      const autoEA=(cost>0&&spTarget>0)?Math.ceil(spTarget/cost):0;
+      const autoTotal=autoEA*cost;
       logRows.push({
-        id:Date.now()+pIdx*10+d, date:dateVal, dayName, dept:DEPT_FIXED,
+        id:Date.now()+pIdx*100+d,
+        date:dateVal, dayName, dept:DEPT_FIXED,
         jv:item.JV||'', description:item.Discription,
-        persons:[person.name], workOrder:'', ea:'', cost:item.Cost||0, total:0
+        persons:[person.name], workOrder:'',
+        ea:autoEA||'', cost, total:autoTotal,
+        eaAuto:true
       });
     }
   });
   renderTable(); updateManpowerMonths(); autoSave();
+
+  if(offPersons.length>0){
+    document.getElementById('infoBar').innerHTML=
+      `✅ สุ่มงานวัน ${dateVal} สำเร็จ (${activePersons.length} คน) &nbsp;|&nbsp; `+
+      `<span class="off-warning">🚫 หยุด: ${offPersons.map(p=>p.name).join(', ')}</span>`;
+  }
 }
 
 function getCostByJV(jv){
@@ -947,7 +1161,7 @@ function renderTable(){
       <td><span style="font-size:13px;font-weight:700;color:var(--accent2)">${DEPT_FIXED}</span></td>
       <td>${descCell}</td>
       <td>${personCell}</td>
-      <td><input type="number" min="0" value="${row.ea||''}" placeholder="0" onchange="updateEA(${idx},this.value)" style="width:60px;text-align:right"></td>
+      <td><input type="number" min="0" value="${row.ea||''}" placeholder="0" onchange="updateEA(${idx},this.value)" style="width:60px;text-align:right" title="${row.eaAuto?'EA อัตโนมัติ (แก้ไขได้)':''}">${row.eaAuto?`<span style="font-size:9px;color:var(--accent2);display:block;text-align:center;font-weight:700">⚡ AUTO</span>`:''}</td>
       <td>${costCell}</td>
       <td class="total-cell">${totalStr||'–'}</td>
       <td><span class="split-info">${escHtml(splitStr)}</span></td>
@@ -1053,9 +1267,87 @@ function renderManpower(){
   }).join('');
 }
 
+/* ─── SHIFT TAB ─── */
+function updateShiftFilterMonths(){
+  // Collect all months present in shiftData
+  const monthSet=new Set();
+  Object.values(shiftData).forEach(dSet=>{
+    dSet.forEach(d=>monthSet.add(d.slice(0,7)));
+  });
+  const months=[...monthSet].sort();
+  const sel=document.getElementById('shiftFilterMonth');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">-- ทุกเดือน --</option>';
+  months.forEach(m=>{
+    const [y,mo]=m.split('-');
+    sel.innerHTML+=`<option value="${m}" ${m===cur?'selected':''}>${MONTH_NAMES[parseInt(mo)-1]} ${parseInt(y)+543}</option>`;
+  });
+}
+
+function renderShiftTab(){
+  const filterM=document.getElementById('shiftFilterMonth').value;
+  // Collect all dates across all persons
+  let allDates=new Set();
+  Object.values(shiftData).forEach(dSet=>dSet.forEach(d=>allDates.add(d)));
+  let dates=[...allDates].sort();
+  if(filterM) dates=dates.filter(d=>d.startsWith(filterM));
+
+  const container=document.getElementById('shiftTable');
+  if(dates.length===0||PERSONS.length===0){
+    container.innerHTML=`<div style="text-align:center;padding:40px;color:var(--text-muted);font-size:15px">
+      ยังไม่มีข้อมูลตารางกะ — อัปโหลด Excel ตารางกะในแถบ "Daily Log"</div>`;
+    document.getElementById('shiftSummary').textContent='';
+    return;
+  }
+
+  const dayNames=['อา','จ','อ','พ','พฤ','ศ','ส'];
+  // Count off totals
+  let totalOffCells=0;
+
+  const headerCols=dates.map(d=>{
+    const dateObj=new Date(d+'T00:00:00');
+    const day=dayNames[dateObj.getDay()];
+    const isWknd=dateObj.getDay()===0||dateObj.getDay()===6;
+    const shortDate=`${d.slice(8)}/${d.slice(5,7)}`;
+    return `<th style="${isWknd?'background:rgba(192,57,43,0.08);color:var(--red)':''}">${day}<br><span style="font-size:9px;font-weight:400">${shortDate}</span></th>`;
+  }).join('');
+
+  const bodyRows=PERSONS.map(p=>{
+    const cells=dates.map(d=>{
+      const off=isPersonOff(p.name,d);
+      if(off){ totalOffCells++; return `<td><span class="shift-cell-off">OFF</span></td>`; }
+      const hasData=shiftData[p.name]!==undefined;
+      return hasData
+        ?`<td><span class="shift-cell-work">✓</span></td>`
+        :`<td><span class="shift-cell-nodata">–</span></td>`;
+    }).join('');
+    const offCount=shiftData[p.name]?[...shiftData[p.name]].filter(d=>filterM?d.startsWith(filterM):true).length:0;
+    return `<tr>
+      <td class="name-col">${p.name}
+        <span class="level-badge lvl${p.level}">L${p.level}</span>
+        ${offCount>0?`<span class="off-warning">${offCount} วัน</span>`:''}
+      </td>
+      ${cells}
+    </tr>`;
+  }).join('');
+
+  container.innerHTML=`
+    <div style="border:1.5px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+      <table class="shift-table">
+        <thead><tr><th class="name-col">ชื่อ-Level</th>${headerCols}</tr></thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+    </div>`;
+
+  document.getElementById('shiftSummary').textContent=
+    `แสดง ${dates.length} วัน | วันหยุดรวม ${totalOffCells} รายการ`;
+}
+
 /* ─── EXPORT / IMPORT ─── */
 function exportData(){
-  const blob=new Blob([JSON.stringify({logRows,jvData,descData,manualDescs},null,2)],{type:'application/json'});
+  const shiftSerial={};
+  Object.entries(shiftData).forEach(([k,v])=>{ shiftSerial[k]=[...v]; });
+  const blob=new Blob([JSON.stringify({logRows,jvData,descData,manualDescs,shiftData:shiftSerial},null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
   a.download=`worklog_${new Date().toISOString().slice(0,10)}.json`;
@@ -1072,7 +1364,12 @@ function importData(input){
       if(obj.jvData) jvData=obj.jvData;
       if(obj.descData) descData=obj.descData;
       if(obj.manualDescs) manualDescs=obj.manualDescs;
+      if(obj.shiftData){
+        shiftData={};
+        Object.entries(obj.shiftData).forEach(([k,v])=>{ shiftData[k]=new Set(v); });
+      }
       renderTable(); renderPool(); renderManpower();
+      updateShiftFilterMonths(); renderShiftTab();
       document.getElementById('jvFileName').innerHTML=`<span class="status-dot ok"></span>โหลดจาก JSON (${jvData.length} รายการ)`;
       document.getElementById('descFileName').innerHTML=`<span class="status-dot ok"></span>โหลดจาก JSON (${descData.length} รายการ)`;
       updateInfo();
@@ -1089,6 +1386,7 @@ function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&l
 document.getElementById('pickDate').value=new Date().toISOString().slice(0,10);
 renderPool();
 renderManpower();
+updateShiftFilterMonths();
 checkDB();
 </script>
 </body>
