@@ -1323,7 +1323,7 @@ function copyAllRows(){
   const lines=logRows.map((row,idx)=>
     `${idx+1}\t${row.workOrder||''}\t${row.jv||''}\t${DEPT_FIXED}\t${row.description||''}`
   );
-  navigator.clipboard.writeText([header,...lines].join('\n')).then(()=>{
+  navigator.clipboard.writeText(lines.join('\n')).then(()=>{
     const btn=document.getElementById('copyAllBtn');
     const orig=btn.innerHTML;
     btn.innerHTML='✅ Copied!';
