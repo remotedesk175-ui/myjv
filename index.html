@@ -973,21 +973,26 @@ function parseHeaderDate(h){
   if(h===null||h===undefined||h==='') return null;
 
   // XLSX date object จาก raw:true — {t:'d', v:Date, w:'string'}
-  if(typeof h==='object' && h!==null && h.t==='d' && h.v instanceof Date){
+  if(typeof h==='object' && h!==null && !(h instanceof Date) && h.t==='d' && h.v instanceof Date){
     const d=h.v;
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   }
 
-  // JS Date object
+  // JS Date object (XLSX.js คืนตรงๆ) — บวก 12 ชม. ก่อนอ่าน local date เพื่อป้องกัน timezone off-by-one
   if(h instanceof Date){
-    return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`;
+    const safe = new Date(h.getTime() + 12*60*60*1000);
+    return `${safe.getFullYear()}-${String(safe.getMonth()+1).padStart(2,'0')}-${String(safe.getDate()).padStart(2,'0')}`;
   }
 
   // Excel serial number (number หรือ float-string เช่น "45839.0")
   const num = typeof h==='number' ? h : (typeof h==='string' && /^\d{5}(\.\d+)?$/.test(h.trim()) ? parseFloat(h) : NaN);
   if(!isNaN(num) && num>40000 && num<60000){
-    const d=XLSX.SSF.parse_date_code(Math.floor(num));
-    if(d) return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+    // แปลง Excel serial → JS Date
+    // Excel นับจาก 1899-12-30 (หักล้าง leap year bug ของ Excel ปี 1900)
+    const msPerDay = 86400000;
+    const excelEpoch = new Date(1899, 11, 30).getTime(); // 1899-12-30
+    const jsDate = new Date(excelEpoch + Math.floor(num) * msPerDay);
+    return `${jsDate.getFullYear()}-${String(jsDate.getMonth()+1).padStart(2,'0')}-${String(jsDate.getDate()).padStart(2,'0')}`;
   }
 
   const s=String(h).trim();
