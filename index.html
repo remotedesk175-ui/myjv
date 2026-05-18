@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Work Log SystemV2</title>
+<title>Work Log System</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -918,14 +918,16 @@ function loadShiftFile(input){
       const wb=XLSX.read(e.target.result,{type:'binary',cellDates:true});
       const ws=wb.Sheets[wb.SheetNames[0]];
       // Get raw with header:1 to access header row
-      const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
       if(raw.length<2){ alert('ไฟล์ตารางกะต้องมีอย่างน้อย 2 แถว (header + ข้อมูล)'); return; }
 
       const headers=raw[0];
-      // Parse date columns
-      const dateCols=[]; // [{colIdx, dateStr "YYYY-MM-DD"}]
-      for(let c=1;c<headers.length;c++){
-        const h=headers[c];
+      // Parse date columns — raw:false ทำให้ XLSX แปลง date เป็น string "m/d/yy" อัตโนมัติ
+      // แต่เราต้องการ YYYY-MM-DD จึงใช้ sheet_to_json แบบ raw:true แยกสำหรับ header
+      const rawHeaders=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:true})[0];
+      const dateCols=[];
+      for(let c=1;c<rawHeaders.length;c++){
+        const h=rawHeaders[c];
         const d=parseHeaderDate(h);
         if(d) dateCols.push({colIdx:c, dateStr:d});
       }
@@ -954,6 +956,7 @@ function loadShiftFile(input){
         `<span class="status-dot ok"></span>${file.name} (${personCount} คน, ${dateCols.length} วัน)`;
       document.getElementById('shiftPreview').innerHTML=
         `พบวันหยุดรวม <strong>${totalOff}</strong> รายการ | ` +
+        (dateCols.length>0 ? `วันแรก: ${dateCols[0].dateStr} | วันสุดท้าย: ${dateCols[dateCols.length-1].dateStr} | ` : `⚠ ไม่พบคอลัมน์วันที่ | `) +
         Object.entries(shiftData).map(([n,s])=>`${n}: ${s.size} วัน`).join(' | ');
 
       updateShiftFilterMonths();
@@ -967,17 +970,25 @@ function loadShiftFile(input){
 /* Parse date from Excel header cell — returns "YYYY-MM-DD" or null */
 function parseHeaderDate(h){
   if(h===null||h===undefined||h==='') return null;
-  // Excel serial number (number or float-string like "45839.0")
-  if(typeof h==='number' || /^\d{5}(\.\d+)?$/.test(String(h).trim())){
-    const serial=Math.floor(typeof h==='number'?h:parseFloat(h));
-    if(serial>40000&&serial<60000){ // sanity: year ~2009–2064
-      const d=XLSX.SSF.parse_date_code(serial);
-      if(d) return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
-    }
+
+  // XLSX date object จาก raw:true — {t:'d', v:Date, w:'string'}
+  if(typeof h==='object' && h!==null && h.t==='d' && h.v instanceof Date){
+    const d=h.v;
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   }
+
+  // JS Date object
   if(h instanceof Date){
-    return h.toISOString().slice(0,10);
+    return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`;
   }
+
+  // Excel serial number (number หรือ float-string เช่น "45839.0")
+  const num = typeof h==='number' ? h : (typeof h==='string' && /^\d{5}(\.\d+)?$/.test(h.trim()) ? parseFloat(h) : NaN);
+  if(!isNaN(num) && num>40000 && num<60000){
+    const d=XLSX.SSF.parse_date_code(Math.floor(num));
+    if(d) return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+  }
+
   const s=String(h).trim();
   // YYYY-MM-DD
   if(/^\d{4}-\d{1,2}-\d{1,2}$/.test(s)){
