@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Work Log Systems</title>
+<title>Work Log SystemV2</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -966,11 +966,14 @@ function loadShiftFile(input){
 
 /* Parse date from Excel header cell — returns "YYYY-MM-DD" or null */
 function parseHeaderDate(h){
-  if(!h && h!==0) return null;
-  // Excel serial number (number)
-  if(typeof h==='number'){
-    const d=XLSX.SSF.parse_date_code(h);
-    if(d) return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+  if(h===null||h===undefined||h==='') return null;
+  // Excel serial number (number or float-string like "45839.0")
+  if(typeof h==='number' || /^\d{5}(\.\d+)?$/.test(String(h).trim())){
+    const serial=Math.floor(typeof h==='number'?h:parseFloat(h));
+    if(serial>40000&&serial<60000){ // sanity: year ~2009–2064
+      const d=XLSX.SSF.parse_date_code(serial);
+      if(d) return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+    }
   }
   if(h instanceof Date){
     return h.toISOString().slice(0,10);
@@ -981,10 +984,9 @@ function parseHeaderDate(h){
     const [y,m,d]=s.split('-');
     return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
   }
-  // DD/MM/YYYY or MM/DD/YYYY
+  // DD/MM/YYYY
   if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)){
     const [a,b,y]=s.split('/');
-    // assume DD/MM/YYYY (Thai convention)
     return `${y}-${b.padStart(2,'0')}-${a.padStart(2,'0')}`;
   }
   // D-M-YYYY
@@ -995,11 +997,21 @@ function parseHeaderDate(h){
   return null;
 }
 
-/* Returns true if cell value means "day off" */
+/* Returns true if cell value means "day off"
+   ไฟล์นี้ใช้: 0 = หยุด, 1 = ทำงาน
+   รองรับทั้งตัวเลขและ text */
 function isOffValue(val){
-  if(val===''||val==='w'||val==='work'||val==='ทำงาน'||val==='1') return false;
-  // off markers
-  return ['off','หยุด','0','wd','x','วันหยุด','leave','lv','ลา'].includes(val) || val.startsWith('off') || val.startsWith('หยุด');
+  if(val===''||val===null||val===undefined) return false;
+  const v=String(val).trim().toLowerCase();
+  // numeric: 0 = off, 1 = work
+  if(v==='0'||v==='0.0') return true;
+  if(v==='1'||v==='1.0') return false;
+  // text off markers
+  if(['off','หยุด','wd','x','วันหยุด','leave','lv','ลา'].includes(v)) return true;
+  if(v.startsWith('off')||v.startsWith('หยุด')) return true;
+  // text work markers
+  if(['w','work','ทำงาน'].includes(v)) return false;
+  return false;
 }
 
 /* Check if person has day off on given date */
