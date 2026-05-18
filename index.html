@@ -496,7 +496,46 @@
     margin-bottom: 16px;
   }
 
-  /* SHIFT TABLE */
+  /* TABLE SECTION DIVIDER */
+  .section-header-row th {
+    background: var(--surface2);
+    color: var(--text-muted);
+    font-size: 10px;
+    font-family: 'Space Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 5px 10px;
+    border-top: 2px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    font-weight: 700;
+  }
+  .section-header-row th.section-label {
+    color: var(--accent);
+    background: var(--yellow-bg);
+    border-top-color: var(--accent);
+  }
+  .section-header-row th.section-label-blue {
+    color: var(--accent2);
+    background: var(--blue-bg);
+    border-top-color: var(--accent2);
+  }
+  th.col-job  { border-left: 3px solid var(--accent) !important; }
+  th.col-cost { border-left: 3px solid var(--accent2) !important; }
+  td.col-job  { border-left: 3px solid rgba(180,83,9,0.2); }
+  td.col-cost { border-left: 3px solid rgba(29,111,206,0.2); }
+
+  .copy-btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 9px; border-radius: 5px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text-muted);
+    cursor: pointer; font-size: 12px; font-weight: 600;
+    transition: all 0.15s; white-space: nowrap;
+    font-family: 'Sarabun', sans-serif;
+  }
+  .copy-btn:hover { background: var(--accent2); color: #fff; border-color: var(--accent2); }
+  .copy-btn.copied { background: var(--green); color: #fff; border-color: var(--green); }
   .shift-table { width:100%; border-collapse:collapse; font-size:13px; }
   .shift-table th {
     background: var(--surface2);
@@ -621,6 +660,7 @@
     </div>
     <button class="btn primary" onclick="addDay()">🎲 สุ่มงาน 5 คน</button>
     <button class="btn blue" onclick="addManualRow()">✏️ เพิ่มแถวเอง</button>
+    <button class="copy-btn" id="copyAllBtn" onclick="copyAllRows()" style="padding:9px 14px;font-size:14px">📋 Copy ทั้งหมด</button>
     <button class="btn success" onclick="saveAllToDB()">💾 บันทึกลง DB</button>
     <button class="btn" onclick="exportData()">📤 Export JSON</button>
     <label class="btn" for="importJSON">📥 Import JSON</label>
@@ -633,15 +673,19 @@
   <div class="table-wrap">
     <table id="logTable">
       <thead>
+        <tr class="section-header-row">
+          <th colspan="7" class="section-label">📋 ข้อมูลงาน (Job Info)</th>
+          <th colspan="6" class="section-label-blue">💰 ข้อมูลต้นทุน (Cost Info)</th>
+        </tr>
         <tr>
-          <th>#</th>
+          <th class="col-job">#</th>
           <th>Day</th>
           <th>Date</th>
           <th>Work Order</th>
           <th>Job Value (JV)</th>
           <th>Dept</th>
           <th>Description</th>
-          <th>Person(s)</th>
+          <th class="col-cost">Person(s)</th>
           <th>EA</th>
           <th>Cost/Unit</th>
           <th>JV Total</th>
@@ -1193,14 +1237,19 @@ function renderTable(){
 
     return `
     <tr style="${isManual?'background:rgba(29,111,206,0.03)':''}">
-      <td style="color:var(--text-dim);font-family:'Space Mono',monospace;font-size:12px;font-weight:700">${idx+1}${manualMark}</td>
+      <td class="col-job" style="color:var(--text-dim);font-family:'Space Mono',monospace;font-size:12px;font-weight:700">${idx+1}${manualMark}</td>
       <td><span class="day-badge">${row.dayName}</span></td>
       <td><span class="date-badge">${row.date}</span></td>
       <td><input type="text" value="${escHtml(row.workOrder)}" placeholder="WO-XXXX" onchange="logRows[${idx}].workOrder=this.value;autoSave()"></td>
       <td>${jvCell}</td>
       <td><span style="font-size:13px;font-weight:700;color:var(--accent2)">${DEPT_FIXED}</span></td>
-      <td>${descCell}</td>
-      <td>${personCell}</td>
+      <td>
+        <div style="display:flex;align-items:flex-start;gap:6px">
+          <div style="flex:1">${descCell}</div>
+          <button class="copy-btn" id="copybtn-${idx}" onclick="copyRowInfo(${idx},this)" title="Copy NO./WO./JV/Dept/Description">📋</button>
+        </div>
+      </td>
+      <td class="col-cost">${personCell}</td>
       <td><input type="number" min="0" value="${row.ea||''}" placeholder="0" onchange="updateEA(${idx},this.value)" style="width:60px;text-align:right" title="${row.eaAuto?'EA อัตโนมัติ (แก้ไขได้)':''}">${row.eaAuto?`<span style="font-size:9px;color:var(--accent2);display:block;text-align:center;font-weight:700">⚡ AUTO</span>`:''}</td>
       <td>${costCell}</td>
       <td class="total-cell">${totalStr||'–'}</td>
@@ -1243,6 +1292,37 @@ function updateEA(idx,val){
   logRows[idx].ea=parseFloat(val)||0;
   logRows[idx].total=logRows[idx].ea*(logRows[idx].cost||0);
   renderTable(); renderManpower(); autoSave();
+}
+
+function copyRowInfo(idx, btn){
+  const row=logRows[idx];
+  const no=idx+1;
+  const wo=row.workOrder||'';
+  const jv=row.jv||'';
+  const dept=DEPT_FIXED;
+  const desc=row.description||'';
+  const text=`${no}\t${wo}\t${jv}\t${dept}\t${desc}`;
+  navigator.clipboard.writeText(text).then(()=>{
+    const orig=btn.innerHTML;
+    btn.innerHTML='✅';
+    btn.classList.add('copied');
+    setTimeout(()=>{ btn.innerHTML=orig; btn.classList.remove('copied'); },1500);
+  }).catch(()=>alert('Copy ไม่ได้ — ลองเปิดในเบราว์เซอร์อื่น'));
+}
+
+function copyAllRows(){
+  if(logRows.length===0){ alert('ไม่มีข้อมูล'); return; }
+  const header='NO.\tWO.\tJV\tDept\tDescription';
+  const lines=logRows.map((row,idx)=>
+    `${idx+1}\t${row.workOrder||''}\t${row.jv||''}\t${DEPT_FIXED}\t${row.description||''}`
+  );
+  navigator.clipboard.writeText([header,...lines].join('\n')).then(()=>{
+    const btn=document.getElementById('copyAllBtn');
+    const orig=btn.innerHTML;
+    btn.innerHTML='✅ Copied!';
+    btn.classList.add('copied');
+    setTimeout(()=>{ btn.innerHTML=orig; btn.classList.remove('copied'); },2000);
+  }).catch(()=>alert('Copy ไม่ได้'));
 }
 
 function deleteRow(idx){
