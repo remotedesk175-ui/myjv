@@ -513,6 +513,9 @@
   .shift-table td { padding:7px 6px; text-align:center; vertical-align:middle; font-weight:600; }
   .shift-table td.name-col { text-align:left; font-size:14px; font-weight:700; color:var(--text); }
   .shift-cell-work { color:var(--green); font-size:13px; }
+  .shift-cell-day  { display:inline-block; background:rgba(29,111,206,0.12); color:var(--accent2); border-radius:4px; padding:2px 7px; font-size:11px; font-weight:700; }
+  .shift-cell-aft  { display:inline-block; background:rgba(180,83,9,0.12);   color:var(--accent);  border-radius:4px; padding:2px 7px; font-size:11px; font-weight:700; }
+  .shift-cell-ngt  { display:inline-block; background:rgba(88,28,135,0.12);  color:#7c3aed;        border-radius:4px; padding:2px 7px; font-size:11px; font-weight:700; }
   .shift-cell-off {
     background:rgba(192,57,43,0.1); color:var(--red);
     border-radius:4px; font-size:11px; font-weight:700; padding:2px 5px;
@@ -747,9 +750,11 @@ function saveToLocalStorage(){
   localStorage.setItem('worklog_jvData', JSON.stringify(jvData));
   localStorage.setItem('worklog_descData', JSON.stringify(descData));
   localStorage.setItem('worklog_manualDescs', JSON.stringify(manualDescs));
-  // Convert Sets to arrays for JSON serialization
   const shiftSerial={};
-  Object.entries(shiftData).forEach(([k,v])=>{ shiftSerial[k]=[...v]; });
+  Object.entries(shiftData).forEach(([k,v])=>{
+    if(k.endsWith('_raw')) shiftSerial[k]=v; // plain object, JSON-safe
+    else shiftSerial[k]=[...v]; // Set → array
+  });
   localStorage.setItem('worklog_shiftData', JSON.stringify(shiftSerial));
 }
 
@@ -763,11 +768,13 @@ function loadFromLocalStorage(){
     if(desc) descData = JSON.parse(desc);
     const manual = localStorage.getItem('worklog_manualDescs');
     if(manual) manualDescs = JSON.parse(manual);
-    const shift = localStorage.getItem('worklog_shiftData');
     if(shift){
       const parsed=JSON.parse(shift);
       shiftData={};
-      Object.entries(parsed).forEach(([k,v])=>{ shiftData[k]=new Set(v); });
+      Object.entries(parsed).forEach(([k,v])=>{
+        if(k.endsWith('_raw')) shiftData[k]=v; // plain object
+        else shiftData[k]=new Set(v); // array → Set
+      });
     }
   } catch(e){}
   renderTable(); renderPool(); renderManpower(); updateManpowerMonths();
@@ -933,18 +940,23 @@ function loadShiftFile(input){
         if(d) dateCols.push({colIdx:c, dateStr:d});
       }
 
+      // ใช้ raw:true สำหรับ data rows เพื่อรักษาค่า null (None) ไว้
+      const rawData=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
+
       shiftData={};
       let totalOff=0;
-      for(let r=1;r<raw.length;r++){
-        const row=raw[r];
+      for(let r=1;r<rawData.length;r++){
+        const row=rawData[r];
         const nameRaw=String(row[0]||'').trim();
         if(!nameRaw) continue;
-        // match person by name (partial or full)
         const person=PERSONS.find(p=>nameRaw.includes(p.name)||p.name.includes(nameRaw));
         const key=person?person.name:nameRaw;
         if(!shiftData[key]) shiftData[key]=new Set();
+        if(!shiftData[key+'_raw']) shiftData[key+'_raw']={};
         dateCols.forEach(({colIdx,dateStr})=>{
-          const val=String(row[colIdx]||'').trim().toLowerCase();
+          const val=row[colIdx]; // null หรือ 'd','a','n' — ไม่แปลงก่อน
+          const display=val===null||val===undefined?'':String(val).trim().toLowerCase();
+          shiftData[key+'_raw'][dateStr]=display;
           if(isOffValue(val)){
             shiftData[key].add(dateStr);
             totalOff++;
@@ -958,7 +970,7 @@ function loadShiftFile(input){
       document.getElementById('shiftPreview').innerHTML=
         `พบวันหยุดรวม <strong>${totalOff}</strong> รายการ | ` +
         (dateCols.length>0 ? `วันแรก: ${dateCols[0].dateStr} | วันสุดท้าย: ${dateCols[dateCols.length-1].dateStr} | ` : `⚠ ไม่พบคอลัมน์วันที่ | `) +
-        Object.entries(shiftData).map(([n,s])=>`${n}: ${s.size} วัน`).join(' | ');
+        Object.entries(shiftData).filter(([k])=>!k.endsWith('_raw')).map(([n,s])=>`${n}: ${s.size} วัน`).join(' | ');
 
       updateShiftFilterMonths();
       renderShiftTab();
@@ -1015,20 +1027,18 @@ function parseHeaderDate(h){
 }
 
 /* Returns true if cell value means "day off"
-   ไฟล์นี้ใช้: 0 = หยุด, 1 = ทำงาน
-   รองรับทั้งตัวเลขและ text */
+   d = Day, a = Afternoon, n = Night → ทำงาน
+   None / ว่าง / 0 / off / หยุด → หยุด */
 function isOffValue(val){
-  if(val===''||val===null||val===undefined) return false;
+  if(val===null||val===undefined) return true; // None = หยุด
   const v=String(val).trim().toLowerCase();
-  // numeric: 0 = off, 1 = work
-  if(v==='0'||v==='0.0') return true;
-  if(v==='1'||v==='1.0') return false;
-  // text off markers
-  if(['off','หยุด','wd','x','วันหยุด','leave','lv','ลา'].includes(v)) return true;
+  if(v==='') return true; // ว่าง = หยุด
+  // กะทำงาน
+  if(['d','a','n','1','1.0','w','work','ทำงาน','day','afternoon','night'].includes(v)) return false;
+  // วันหยุดชัดเจน
+  if(['0','0.0','off','หยุด','wd','x','วันหยุด','leave','lv','ลา','-'].includes(v)) return true;
   if(v.startsWith('off')||v.startsWith('หยุด')) return true;
-  // text work markers
-  if(['w','work','ทำงาน'].includes(v)) return false;
-  return false;
+  return true; // ค่าอื่นที่ไม่รู้จัก = หยุด (safe default)
 }
 
 /* Check if person has day off on given date */
@@ -1301,8 +1311,9 @@ function renderManpower(){
 function updateShiftFilterMonths(){
   // Collect all months present in shiftData
   const monthSet=new Set();
-  Object.values(shiftData).forEach(dSet=>{
-    dSet.forEach(d=>monthSet.add(d.slice(0,7)));
+  Object.entries(shiftData).forEach(([k,v])=>{
+    if(k.endsWith('_raw')) return;
+    v.forEach(d=>monthSet.add(d.slice(0,7)));
   });
   const months=[...monthSet].sort();
   const sel=document.getElementById('shiftFilterMonth');
@@ -1318,7 +1329,7 @@ function renderShiftTab(){
   const filterM=document.getElementById('shiftFilterMonth').value;
   // Collect all dates across all persons
   let allDates=new Set();
-  Object.values(shiftData).forEach(dSet=>dSet.forEach(d=>allDates.add(d)));
+  Object.entries(shiftData).forEach(([k,v])=>{ if(!k.endsWith('_raw')) v.forEach(d=>allDates.add(d)); });
   let dates=[...allDates].sort();
   if(filterM) dates=dates.filter(d=>d.startsWith(filterM));
 
@@ -1347,9 +1358,14 @@ function renderShiftTab(){
       const off=isPersonOff(p.name,d);
       if(off){ totalOffCells++; return `<td><span class="shift-cell-off">OFF</span></td>`; }
       const hasData=shiftData[p.name]!==undefined;
-      return hasData
-        ?`<td><span class="shift-cell-work">✓</span></td>`
-        :`<td><span class="shift-cell-nodata">–</span></td>`;
+      if(!hasData) return `<td><span class="shift-cell-nodata">–</span></td>`;
+      // แสดง shift type ถ้ามี
+      const raw=shiftData[p.name+'_raw']&&shiftData[p.name+'_raw'][d];
+      const v=raw?String(raw).trim().toLowerCase():'';
+      if(v==='d') return `<td><span class="shift-cell-day">D</span></td>`;
+      if(v==='a') return `<td><span class="shift-cell-aft">A</span></td>`;
+      if(v==='n') return `<td><span class="shift-cell-ngt">N</span></td>`;
+      return `<td><span class="shift-cell-work">✓</span></td>`;
     }).join('');
     const offCount=shiftData[p.name]?[...shiftData[p.name]].filter(d=>filterM?d.startsWith(filterM):true).length:0;
     return `<tr>
@@ -1390,7 +1406,10 @@ function clearAllData(){
 /* ─── EXPORT / IMPORT ─── */
 function exportData(){
   const shiftSerial={};
-  Object.entries(shiftData).forEach(([k,v])=>{ shiftSerial[k]=[...v]; });
+  Object.entries(shiftData).forEach(([k,v])=>{
+    if(k.endsWith('_raw')) shiftSerial[k]=v;
+    else shiftSerial[k]=[...v];
+  });
   const blob=new Blob([JSON.stringify({logRows,jvData,descData,manualDescs,shiftData:shiftSerial},null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -1410,7 +1429,10 @@ function importData(input){
       if(obj.manualDescs) manualDescs=obj.manualDescs;
       if(obj.shiftData){
         shiftData={};
-        Object.entries(obj.shiftData).forEach(([k,v])=>{ shiftData[k]=new Set(v); });
+        Object.entries(obj.shiftData).forEach(([k,v])=>{
+          if(k.endsWith('_raw')) shiftData[k]=v;
+          else shiftData[k]=new Set(v);
+        });
       }
       renderTable(); renderPool(); renderManpower();
       updateShiftFilterMonths(); renderShiftTab();
