@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Work Log System2</title>
+<title>Work Log System</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -1022,10 +1022,10 @@ function addDay(){
   const dateVal=document.getElementById('pickDate').value;
   if(!dateVal){ alert('กรุณาเลือกวันที่'); return; }
 
-  // Filter pool: ตัด JV ที่มี Cost <= 10,000 ออก (ไม่สุ่มให้)
-  const validPool=pool.filter(item=>(item.Cost||0)>10000);
+  // Filter pool: ตัด JV ที่มี Cost > 10,000 ออก (ต้องมี Cost <= 10,000 เท่านั้น)
+  const validPool=pool.filter(item=>(item.Cost||0)<=10000 && (item.Cost||0)>0);
   if(validPool.length===0){
-    alert('ไม่มี JV ที่มี Cost > 10,000 ใน Pool กรุณาตรวจสอบข้อมูล');
+    alert('ไม่มี JV ที่มี Cost ≤ 10,000 ใน Pool กรุณาตรวจสอบข้อมูล');
     return;
   }
 
