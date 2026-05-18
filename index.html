@@ -586,7 +586,8 @@
 </header>
 
 <div class="tabs">
-  <button class="tab-btn active" onclick="switchTab('log')">📋 Daily Log</button>
+  <button class="tab-btn active" onclick="switchTab('log')">⚙ ตั้งค่า / Import</button>
+  <button class="tab-btn" onclick="switchTab('table')">📋 ตารางงาน</button>
   <button class="tab-btn" onclick="switchTab('manpower')">👥 Manpower</button>
   <button class="tab-btn" onclick="switchTab('shift')">📅 ตารางกะ</button>
 </div>
@@ -650,6 +651,11 @@
     </div>
   </div>
 
+</div>
+
+<!-- ═══════════════ TAB: ตารางงาน ═══════════════ -->
+<div id="tab-table" class="tab-content">
+
   <div class="toolbar">
     <label>วันที่:</label>
     <input type="date" id="pickDate">
@@ -658,7 +664,7 @@
       <label><input type="radio" name="descPerPerson" value="1" checked><span>1 งาน/คน</span></label>
       <label><input type="radio" name="descPerPerson" value="2"><span>2 งาน/คน</span></label>
     </div>
-    <button class="btn primary" onclick="addDay()">🎲 สุ่มงาน 5 คน</button>
+    <button class="btn primary" onclick="addDay()">🎲 สุ่มงาน</button>
     <button class="btn blue" onclick="addManualRow()">✏️ เพิ่มแถวเอง</button>
     <button class="copy-btn" id="copyAllBtn" onclick="copyAllRows()" style="padding:9px 14px;font-size:14px">📋 Copy ทั้งหมด</button>
     <button class="btn success" onclick="saveAllToDB()">💾 บันทึกลง DB</button>
@@ -668,7 +674,7 @@
     <button class="btn danger" onclick="clearAllData()">🗑 ล้างข้อมูลทั้งหมด</button>
   </div>
 
-  <div class="info-bar" id="infoBar">โหลดไฟล์ Excel ทั้งสองไฟล์ก่อน จากนั้นเลือกวันที่แล้วกด "สุ่มงาน 5 คน"</div>
+  <div class="info-bar" id="infoBar">โหลดไฟล์ Excel ในแท็บ "ตั้งค่า / Import" ก่อน จากนั้นเลือกวันที่แล้วกด "สุ่มงาน"</div>
 
   <div class="table-wrap">
     <table id="logTable">
@@ -812,15 +818,16 @@ function loadFromLocalStorage(){
     if(desc) descData = JSON.parse(desc);
     const manual = localStorage.getItem('worklog_manualDescs');
     if(manual) manualDescs = JSON.parse(manual);
+    const shift = localStorage.getItem('worklog_shiftData');
     if(shift){
       const parsed=JSON.parse(shift);
       shiftData={};
       Object.entries(parsed).forEach(([k,v])=>{
-        if(k.endsWith('_raw')) shiftData[k]=v; // plain object
-        else shiftData[k]=new Set(v); // array → Set
+        if(k.endsWith('_raw')) shiftData[k]=v;
+        else shiftData[k]=new Set(v);
       });
     }
-  } catch(e){}
+  } catch(e){ console.error('loadFromLocalStorage error:',e); }
   renderTable(); renderPool(); renderManpower(); updateManpowerMonths();
   updateShiftFilterMonths(); updateInfo();
 }
@@ -861,7 +868,7 @@ function splitLabel(splits, jvTotal){
 
 /* ─── TABS ─── */
 function switchTab(t){
-  const tabNames=['log','manpower','shift'];
+  const tabNames=['log','table','manpower','shift'];
   document.querySelectorAll('.tab-btn').forEach((b,i)=>{
     b.classList.toggle('active', tabNames[i]===t);
   });
