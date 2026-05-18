@@ -622,6 +622,7 @@
     <button class="btn" onclick="exportData()">📤 Export JSON</button>
     <label class="btn" for="importJSON">📥 Import JSON</label>
     <input type="file" id="importJSON" accept=".json" onchange="importData(this)">
+    <button class="btn danger" onclick="clearAllData()">🗑 ล้างข้อมูลทั้งหมด</button>
   </div>
 
   <div class="info-bar" id="infoBar">โหลดไฟล์ Excel ทั้งสองไฟล์ก่อน จากนั้นเลือกวันที่แล้วกด "สุ่มงาน 5 คน"</div>
@@ -1365,6 +1366,20 @@ function renderShiftTab(){
 
   document.getElementById('shiftSummary').textContent=
     `แสดง ${dates.length} วัน | วันหยุดรวม ${totalOffCells} รายการ`;
+}
+
+function clearAllData(){
+  if(!confirm('⚠ ล้างข้อมูลทั้งหมดใช่ไหม?\n(log rows, JV, Description, ตารางกะ)\nไม่สามารถกู้คืนได้หลังจากนี้')) return;
+  logRows=[]; jvData=[]; descData=[]; manualDescs=[]; shiftData={};
+  ['worklog_rows','worklog_jvData','worklog_descData','worklog_manualDescs','worklog_shiftData']
+    .forEach(k=>localStorage.removeItem(k));
+  renderTable(); renderPool(); renderManpower(); updateShiftFilterMonths(); renderShiftTab();
+  document.getElementById('jvFileName').innerHTML=`<span class="status-dot"></span>ยังไม่ได้โหลด`;
+  document.getElementById('descFileName').innerHTML=`<span class="status-dot"></span>ยังไม่ได้โหลด`;
+  document.getElementById('shiftFileName').innerHTML=`<span class="status-dot"></span>ยังไม่ได้โหลด`;
+  document.getElementById('shiftPreview').innerHTML='';
+  updateInfo();
+  alert('✅ ล้างข้อมูลทั้งหมดเรียบร้อย');
 }
 
 /* ─── EXPORT / IMPORT ─── */
