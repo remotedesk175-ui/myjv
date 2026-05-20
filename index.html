@@ -1173,7 +1173,7 @@ function addDay(){
       // EA อัตโนมัติ: ceil(SP_Target / cost) แต่ cost ต้องมีค่า
       const spIdx=PERSONS.findIndex(p=>p.name===person.name);
       const spTarget=spIdx>=0?SP_TARGETS[spIdx]:0;
-      const autoEA = 1;
+      const autoEA = cost > 0 ? Math.floor(10000 / cost) : 1;
       const autoTotal = autoEA * cost;
       logRows.push({
         id:Date.now()+pIdx*100+d,
