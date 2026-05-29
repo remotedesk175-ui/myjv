@@ -280,6 +280,9 @@ select option{background:var(--surface2)}
   <div class="nav-item" onclick="switchPage('requisition')" data-page="requisition">
     <span class="nav-icon">📦</span>เบิกของ
   </div>
+  <div class="nav-item" onclick="switchPage('receiving')" data-page="receiving">
+    <span class="nav-icon">📥</span>รับของ
+  </div>
   <div class="nav-item" onclick="switchPage('manpower')" data-page="manpower">
     <span class="nav-icon">👥</span>Manpower
   </div>
@@ -477,6 +480,59 @@ select option{background:var(--surface2)}
   </div>
 </div>
 
+<!-- ══ PAGE: รับของ ══ -->
+<div class="page" id="page-receiving">
+  <div class="topbar">
+    <div class="page-title">📥 รับของ <span>Goods Receiving</span></div>
+    <div class="topbar-right">
+      <button class="copy-btn" id="copyRecvAllBtn" onclick="copyRecvAll()" style="padding:7px 14px;font-size:13px">📋 Copy ทั้งหมด</button>
+      <button class="btn sm green" onclick="saveAllToDB()">💾 บันทึก</button>
+    </div>
+  </div>
+  <div style="padding:20px 24px">
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <label>วันที่:</label>
+      <input type="date" id="recvDate">
+      <button class="btn blue" onclick="addRecvRow()">✏️ เพิ่มแถวรับของ</button>
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+        <label style="font-size:13px;color:var(--text2);font-weight:600">กรองวันที่:</label>
+        <input type="date" id="recvFilterFrom" onchange="renderRecvTable()" style="font-size:13px;padding:6px 10px">
+        <span style="color:var(--text3)">–</span>
+        <input type="date" id="recvFilterTo" onchange="renderRecvTable()" style="font-size:13px;padding:6px 10px">
+        <button class="btn ghost sm" onclick="clearRecvFilters()">✖</button>
+        <span id="recvCount" style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace"></span>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table id="recvTable">
+        <thead>
+          <tr>
+            <th style="color:var(--accent)">#</th>
+            <th style="color:var(--accent)">Date</th>
+            <th style="color:var(--accent)">PO#</th>
+            <th style="color:var(--accent)">Invoice</th>
+            <th style="color:var(--blue)">Item #</th>
+            <th style="color:var(--blue)">Description</th>
+            <th style="color:var(--purple)">จำนวนรับ</th>
+            <th style="color:var(--blue)">Default Bin</th>
+            <th style="color:var(--green)">Current Balance</th>
+            <th style="color:var(--green)">คงเหลือหลังรับ</th>
+            <th style="color:var(--accent)">Average Cost</th>
+            <th style="color:var(--blue)">Unit Current</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="recvBody">
+          <tr><td colspan="13" class="empty-state"><div class="ico">📥</div>ยังไม่มีรายการรับของ — กด "เพิ่มแถวรับของ"</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <!-- ══ PAGE: MANPOWER ══ -->
 <div class="page" id="page-manpower">
   <div class="topbar">
@@ -644,7 +700,7 @@ const DEPT='Automation';
 const API='http://localhost:3001/api';
 
 /* ══ STATE ══ */
-let jvData=[],descData=[],manualDescs=[],logRows=[],shiftData={},otData=[],reqRows=[],itemMaster=[];
+let jvData=[],descData=[],manualDescs=[],logRows=[],shiftData={},otData=[],reqRows=[],itemMaster=[],recvRows=[];
 let filterPersons=new Set();
 let dbConnected=false;
 
@@ -690,6 +746,7 @@ function saveToLocalStorage(){
   localStorage.setItem('worklog_otData',JSON.stringify(otData));
   localStorage.setItem('worklog_reqRows',JSON.stringify(reqRows));
   localStorage.setItem('worklog_itemMaster',JSON.stringify(itemMaster));
+  localStorage.setItem('worklog_recvRows',JSON.stringify(recvRows));
   const ss={};
   Object.entries(shiftData).forEach(([k,v])=>{ss[k]=k.endsWith('_raw')?v:[...v];});
   localStorage.setItem('worklog_shiftData',JSON.stringify(ss));
@@ -703,6 +760,7 @@ function loadFromLocalStorage(){
     const o=localStorage.getItem('worklog_otData');if(o)otData=JSON.parse(o);
     const rq=localStorage.getItem('worklog_reqRows');if(rq)reqRows=JSON.parse(rq);
     const im=localStorage.getItem('worklog_itemMaster');if(im){itemMaster=JSON.parse(im);updateItemMasterUI();}
+    const rv=localStorage.getItem('worklog_recvRows');if(rv)recvRows=JSON.parse(rv);
     const s=localStorage.getItem('worklog_shiftData');
     if(s){
       const p=JSON.parse(s);shiftData={};
@@ -713,7 +771,7 @@ function loadFromLocalStorage(){
 }
 function renderAll(){
   renderTable();renderPool();renderManpower();updateManpowerMonths();
-  updateShiftFilterMonths();updateOTMonths();renderOT();updateInfo();renderReqTable();
+  updateShiftFilterMonths();updateOTMonths();renderOT();updateInfo();renderReqTable();renderRecvTable();
 }
 
 /* ══ NAVIGATION ══ */
@@ -724,6 +782,7 @@ function switchPage(p){
   if(p==='shift')renderShiftTab();
   if(p==='ot')renderOT();
   if(p==='requisition')renderReqTable();
+  if(p==='receiving')renderRecvTable();
 }
 
 /* ══ COST SPLIT ══ */
@@ -1329,8 +1388,8 @@ function renderShiftTab(){
 /* ══ CLEAR / EXPORT / IMPORT ══ */
 function clearAllData(){
   if(!confirm('⚠ ล้างข้อมูลทั้งหมด?\nไม่สามารถกู้คืนได้'))return;
-  logRows=[];jvData=[];descData=[];manualDescs=[];shiftData={};otData=[];reqRows=[];itemMaster=[];
-  ['worklog_rows','worklog_jvData','worklog_descData','worklog_manualDescs','worklog_shiftData','worklog_otData','worklog_reqRows','worklog_itemMaster'].forEach(k=>localStorage.removeItem(k));
+  logRows=[];jvData=[];descData=[];manualDescs=[];shiftData={};otData=[];reqRows=[];itemMaster=[];recvRows=[];
+  ['worklog_rows','worklog_jvData','worklog_descData','worklog_manualDescs','worklog_shiftData','worklog_otData','worklog_reqRows','worklog_itemMaster','worklog_recvRows'].forEach(k=>localStorage.removeItem(k));
   renderAll();
   ['jvFileName','descFileName','shiftFileName','itemMasterStatus'].forEach(id=>{const el=document.getElementById(id);if(el){el.innerHTML=`<span class="dot-status"></span>ยังไม่ได้โหลด`;el.className='file-status';}});
   document.getElementById('shiftPreview').innerHTML='';
@@ -1338,7 +1397,7 @@ function clearAllData(){
 }
 function exportData(){
   const ss={};Object.entries(shiftData).forEach(([k,v])=>{ss[k]=k.endsWith('_raw')?v:[...v];});
-  const blob=new Blob([JSON.stringify({logRows,jvData,descData,manualDescs,shiftData:ss,otData,reqRows,itemMaster},null,2)],{type:'application/json'});
+  const blob=new Blob([JSON.stringify({logRows,jvData,descData,manualDescs,shiftData:ss,otData,reqRows,itemMaster,recvRows},null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download=`worklog_${new Date().toISOString().slice(0,10)}.json`;a.click();
 }
@@ -1355,6 +1414,7 @@ function importData(input){
       if(obj.otData)otData=obj.otData;
       if(obj.reqRows)reqRows=obj.reqRows;
       if(obj.itemMaster){itemMaster=obj.itemMaster;updateItemMasterUI();}
+      if(obj.recvRows)recvRows=obj.recvRows;
       if(obj.shiftData){shiftData={};Object.entries(obj.shiftData).forEach(([k,v])=>{shiftData[k]=k.endsWith('_raw')?v:new Set(v);});}
       renderAll();
       setFileStatus('jvFileName',`JSON (${jvData.length} รายการ)`);
@@ -1570,11 +1630,13 @@ function renderReqTable(){
     return;
   }
   tbody.innerHTML=filtered.map(({row,idx})=>{
-    const balance=parseFloat(row.balance)||0;
     const qty=parseFloat(row.qty)||0;
-    const remaining=row.balance!==''?(balance-qty):null;
-    const remColor=remaining===null?'var(--text3)':remaining<0?'var(--red)':remaining===0?'var(--accent)':'var(--green)';
-    const remText=remaining===null?'–':remaining.toLocaleString('th-TH',{maximumFractionDigits:4});
+    // Balance ก่อนเบิกรายการนี้
+    const balBefore=row.itemNo?computeBalanceBefore(row.itemNo,row.id,'req'):null;
+    const balAfter=balBefore!==null?balBefore-qty:null;
+    const remColor=balAfter===null?'var(--text3)':balAfter<0?'var(--red)':balAfter===0?'var(--accent)':'var(--green)';
+    const remText=balAfter===null?'–':balAfter.toLocaleString('th-TH',{maximumFractionDigits:4});
+    const balBeforeText=balBefore===null?'–':balBefore.toLocaleString('th-TH',{maximumFractionDigits:4});
     return`<tr>
       <td style="color:var(--text3);font-size:11px;font-family:'JetBrains Mono',monospace;text-align:center">${idx+1}</td>
       <td><span class="badge day">${row.dayName||''}</span></td>
@@ -1594,15 +1656,17 @@ function renderReqTable(){
       <td><input type="text" value="${esc(row.isNo)}" placeholder="IS#"
         onchange="reqRows[${idx}].isNo=this.value;autoSave()" style="width:80px;font-family:'JetBrains Mono',monospace;font-size:12px"></td>
       <td><span style="font-size:12px;color:var(--text2);font-family:'JetBrains Mono',monospace">${esc(row.bin)||'–'}</span></td>
-      <td style="text-align:right"><span style="font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text2)">${row.balance!==''?Number(row.balance).toLocaleString('th-TH',{maximumFractionDigits:4}):'–'}</span></td>
+      <td style="text-align:right">
+        <span style="font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text2)">${balBeforeText}</span>
+      </td>
       <td>
         <input type="number" min="0" step="1" value="${row.qty||''}" placeholder="0"
-          onchange="reqRows[${idx}].qty=this.value;renderReqTable();autoSave()"
+          onchange="reqRows[${idx}].qty=this.value;renderReqTable();renderRecvTable();autoSave()"
           style="width:70px;text-align:center;font-size:13px;font-family:'JetBrains Mono',monospace;border-color:var(--purple);color:var(--purple);font-weight:700">
       </td>
       <td style="text-align:right">
         <span style="font-size:13px;font-family:'JetBrains Mono',monospace;font-weight:700;color:${remColor}">${remText}</span>
-        ${remaining!==null&&remaining<0?`<div style="font-size:10px;color:var(--red);font-weight:700">⚠ เกิน!</div>`:''}
+        ${balAfter!==null&&balAfter<0?`<div style="font-size:10px;color:var(--red);font-weight:700">⚠ เกิน!</div>`:''}
       </td>
       <td style="text-align:right"><span style="font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--accent)">${row.avgCost!==''?Number(row.avgCost).toLocaleString('th-TH',{minimumFractionDigits:2}):'–'}</span></td>
       <td><span class="badge dept" style="font-size:11px">${esc(row.unit)||'–'}</span></td>
@@ -1627,12 +1691,232 @@ function copyReqAll(){
   }).catch(()=>alert('Copy ไม่ได้'));
 }
 
+/* ══ STOCK ENGINE ══
+   Balance จริง = Base Balance (จาก itemMaster) + รับเข้าทั้งหมด − เบิกออกทั้งหมด
+   คำนวณ ณ เวลาที่ render (real-time)
+*/
+function computeBalance(itemNo){
+  const it=itemMaster.find(x=>x.item===itemNo);
+  const base=it?parseFloat(it.balance)||0:0;
+  // รับเข้า
+  const totalRecv=recvRows
+    .filter(r=>r.itemNo===itemNo&&r.qty!=='')
+    .reduce((s,r)=>s+parseFloat(r.qty)||0,0);
+  // เบิกออก
+  const totalReq=reqRows
+    .filter(r=>r.itemNo===itemNo&&r.qty!=='')
+    .reduce((s,r)=>s+parseFloat(r.qty)||0,0);
+  return base+totalRecv-totalReq;
+}
+
+/* Balance ก่อน transaction นี้ (สำหรับแสดง "Balance ณ เวลานั้น") */
+function computeBalanceBefore(itemNo, txId, type){
+  const it=itemMaster.find(x=>x.item===itemNo);
+  const base=it?parseFloat(it.balance)||0:0;
+  // เรียงตาม id (timestamp)
+  const allTx=[
+    ...recvRows.filter(r=>r.itemNo===itemNo&&r.qty!=='').map(r=>({id:r.id,type:'recv',qty:parseFloat(r.qty)||0})),
+    ...reqRows.filter(r=>r.itemNo===itemNo&&r.qty!=='').map(r=>({id:r.id,type:'req',qty:parseFloat(r.qty)||0})),
+  ].sort((a,b)=>a.id-b.id);
+  let bal=base;
+  for(const tx of allTx){
+    if(tx.id===txId&&tx.type===type)break;
+    bal+=tx.type==='recv'?tx.qty:-tx.qty;
+  }
+  return bal;
+}
+
+/* ══ RECEIVING ══ */
+function addRecvRow(){
+  const dateVal=document.getElementById('recvDate').value||new Date().toISOString().slice(0,10);
+  recvRows.push({
+    id:Date.now(), date:dateVal,
+    po:'', invoice:'', itemNo:'',
+    itemDesc:'', qty:'',
+    bin:'', balance:'', avgCost:'', unit:''
+  });
+  renderRecvTable();
+  setTimeout(()=>{
+    const wrap=document.getElementById('recvTable')?.closest('.table-wrap');
+    if(wrap)wrap.scrollTop=wrap.scrollHeight;
+  },50);
+}
+
+/* ดึงข้อมูล item จาก itemMaster ตาม itemNo */
+function fillRecvItem(idx, itemNo){
+  recvRows[idx].itemNo=itemNo;
+  const it=itemMaster.find(x=>x.item.toLowerCase()===itemNo.trim().toLowerCase());
+  if(it){
+    recvRows[idx].itemDesc=it.desc;
+    recvRows[idx].bin=it.bin;
+    recvRows[idx].balance=it.balance;
+    recvRows[idx].avgCost=it.avgCost;
+    recvRows[idx].unit=it.unit;
+    renderRecvTable();
+  } else {
+    // ค้นหาแบบ partial
+    const matches=itemMaster.filter(x=>x.item.toLowerCase().includes(itemNo.trim().toLowerCase()));
+    if(matches.length===1){
+      recvRows[idx].itemDesc=matches[0].desc;
+      recvRows[idx].bin=matches[0].bin;
+      recvRows[idx].balance=matches[0].balance;
+      recvRows[idx].avgCost=matches[0].avgCost;
+      recvRows[idx].unit=matches[0].unit;
+      recvRows[idx].itemNo=matches[0].item;
+      renderRecvTable();
+    } else if(matches.length>1){
+      showRecvItemSuggest(idx, matches);
+    }
+  }
+  autoSave();
+}
+
+function applyRecvItem(idx, itemIdx){
+  const matches=itemMaster.filter(x=>x.item.toLowerCase().includes(recvRows[idx].itemNo.toLowerCase()));
+  const it=matches[itemIdx];if(!it)return;
+  recvRows[idx].itemNo=it.item;
+  recvRows[idx].itemDesc=it.desc;
+  recvRows[idx].bin=it.bin;
+  recvRows[idx].balance=it.balance;
+  recvRows[idx].avgCost=it.avgCost;
+  recvRows[idx].unit=it.unit;
+  renderRecvTable();autoSave();
+}
+
+function showRecvItemSuggest(idx, matches){
+  const cellId=`recv-suggest-${idx}`;
+  const el=document.getElementById(cellId);
+  if(!el)return;
+  el.innerHTML=`<div style="position:relative">
+    <input type="text" value="${esc(recvRows[idx].itemNo)}" placeholder="Item #"
+      oninput="fillRecvItem(${idx},this.value)"
+      onblur="setTimeout(()=>{const s=document.getElementById('rslist-${idx}');if(s)s.remove();},200)"
+      style="width:100px;font-size:12px;font-family:'JetBrains Mono',monospace">
+    <div id="rslist-${idx}" style="position:absolute;top:100%;left:0;z-index:999;background:var(--surface);border:1px solid var(--border2);border-radius:6px;min-width:280px;max-height:160px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.4)">
+      ${matches.slice(0,10).map((it,i)=>`
+        <div onmousedown="applyRecvItem(${idx},${i})"
+          style="padding:7px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)"
+          onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+          <span class="badge jv" style="margin-right:6px">${esc(it.item)}</span>${esc(it.desc)}
+          <span style="color:var(--text3);font-size:10px;margin-left:6px">[${esc(it.bin)}]</span>
+        </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+function deleteRecvRow(idx){
+  if(!confirm('ลบแถวนี้?'))return;
+  recvRows.splice(idx,1);renderRecvTable();autoSave();
+}
+
+function clearRecvFilters(){
+  document.getElementById('recvFilterFrom').value='';
+  document.getElementById('recvFilterTo').value='';
+  renderRecvTable();
+}
+
+function getFilteredRecvRows(){
+  const from=document.getElementById('recvFilterFrom')?.value||'';
+  const to=document.getElementById('recvFilterTo')?.value||'';
+  return recvRows.map((row,idx)=>({row,idx})).filter(({row})=>{
+    if(from&&row.date<from)return false;
+    if(to&&row.date>to)return false;
+    return true;
+  });
+}
+
+function renderRecvTable(){
+  const tbody=document.getElementById('recvBody');
+  if(!tbody)return;
+  if(!recvRows.length){
+    tbody.innerHTML=`<tr><td colspan="13" class="empty-state"><div class="ico">📥</div>ยังไม่มีรายการรับของ — กด "เพิ่มแถวรับของ"</td></tr>`;
+    const rc=document.getElementById('recvCount');if(rc)rc.textContent='';
+    return;
+  }
+  const filtered=getFilteredRecvRows();
+  const rc=document.getElementById('recvCount');
+  if(rc)rc.textContent=`${filtered.length} / ${recvRows.length} แถว`;
+  if(!filtered.length){
+    tbody.innerHTML=`<tr><td colspan="13" class="empty-state"><div class="ico">🔍</div>ไม่พบข้อมูลที่ตรงกับตัวกรอง</td></tr>`;
+    return;
+  }
+  tbody.innerHTML=filtered.map(({row,idx})=>{
+    // ดึงข้อมูล item จาก itemMaster เสมอ (sync อัตโนมัติ)
+    const it=row.itemNo?itemMaster.find(x=>x.item===row.itemNo):null;
+    const itemDesc=it?it.desc:(row.itemDesc||'');
+    const bin=it?it.bin:(row.bin||'');
+    const avgCost=it?it.avgCost:(row.avgCost||'');
+    const unit=it?it.unit:(row.unit||'');
+    const qty=parseFloat(row.qty)||0;
+    // Balance ก่อนรับรายการนี้
+    const balBefore=row.itemNo?computeBalanceBefore(row.itemNo,row.id,'recv'):null;
+    const balAfter=balBefore!==null?balBefore+qty:null;
+    const afterColor=balAfter===null?'var(--text3)':'var(--green)';
+    const afterText=balAfter===null?'–':balAfter.toLocaleString('th-TH',{maximumFractionDigits:4});
+    const balBeforeText=balBefore===null?'–':balBefore.toLocaleString('th-TH',{maximumFractionDigits:4});
+    return`<tr>
+      <td style="color:var(--text3);font-size:11px;font-family:'JetBrains Mono',monospace;text-align:center">${idx+1}</td>
+      <td><span class="badge date">${row.date}</span></td>
+      <td><input type="text" value="${esc(row.po)}" placeholder="PO-XXXX"
+        onchange="recvRows[${idx}].po=this.value;autoSave()"
+        style="width:90px;font-family:'JetBrains Mono',monospace;font-size:12px"></td>
+      <td><input type="text" value="${esc(row.invoice)}" placeholder="INV-XXXX"
+        onchange="recvRows[${idx}].invoice=this.value;autoSave()"
+        style="width:90px;font-family:'JetBrains Mono',monospace;font-size:12px"></td>
+      <td id="recv-suggest-${idx}">
+        <input type="text" value="${esc(row.itemNo)}" placeholder="Item #"
+          oninput="fillRecvItem(${idx},this.value)"
+          style="width:100px;font-size:12px;font-family:'JetBrains Mono',monospace">
+      </td>
+      <td style="font-size:12px;max-width:200px;white-space:normal">
+        ${itemDesc?`<span style="color:var(--text)">${esc(itemDesc)}</span>`:`<span style="color:var(--text3)">–</span>`}
+      </td>
+      <td>
+        <input type="number" min="0" step="1" value="${row.qty||''}" placeholder="0"
+          onchange="recvRows[${idx}].qty=this.value;renderRecvTable();renderReqTable();autoSave()"
+          style="width:70px;text-align:center;font-size:13px;font-family:'JetBrains Mono',monospace;border-color:var(--purple);color:var(--purple);font-weight:700">
+      </td>
+      <td><span style="font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text2)">${esc(bin)||'–'}</span></td>
+      <td style="text-align:right">
+        <span style="font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text2)">${balBeforeText}</span>
+      </td>
+      <td style="text-align:right">
+        <span style="font-size:13px;font-family:'JetBrains Mono',monospace;font-weight:700;color:${afterColor}">${afterText}</span>
+      </td>
+      <td style="text-align:right">
+        <span style="font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--accent)">
+          ${avgCost!==''?Number(avgCost).toLocaleString('th-TH',{minimumFractionDigits:2}):'–'}
+        </span>
+      </td>
+      <td><span class="badge dept" style="font-size:11px">${esc(unit)||'–'}</span></td>
+      <td><button class="btn sm red icon" onclick="deleteRecvRow(${idx})">🗑</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function copyRecvAll(){
+  const filtered=getFilteredRecvRows();
+  if(!filtered.length){alert('ไม่มีข้อมูล');return;}
+  const lines=filtered.map(({row,idx})=>{
+    const balance=parseFloat(row.balance)||0;
+    const qty=parseFloat(row.qty)||0;
+    const afterRecv=row.balance!==''?(balance+qty):'';
+    return`${idx+1}\t${row.date}\t${row.po||''}\t${row.invoice||''}\t${row.itemNo||''}\t${row.itemDesc||''}\t${row.qty||''}\t${row.bin||''}\t${row.balance||''}\t${afterRecv}\t${row.avgCost||''}\t${row.unit||''}`;
+  });
+  navigator.clipboard.writeText(lines.join('\n')).then(()=>{
+    const btn=document.getElementById('copyRecvAllBtn');
+    const orig=btn.innerHTML;btn.innerHTML='✅ Copied!';btn.classList.add('copied');
+    setTimeout(()=>{btn.innerHTML=orig;btn.classList.remove('copied');},2000);
+  }).catch(()=>alert('Copy ไม่ได้'));
+}
+
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 /* ══ INIT ══ */
 document.getElementById('pickDate').value=new Date().toISOString().slice(0,10);
 document.getElementById('otDate').value=new Date().toISOString().slice(0,10);
 document.getElementById('reqDate').value=new Date().toISOString().slice(0,10);
+document.getElementById('recvDate').value=new Date().toISOString().slice(0,10);
 // โหลด salary settings จาก localStorage
 try{
   const savedSalary=localStorage.getItem('worklog_salary');
