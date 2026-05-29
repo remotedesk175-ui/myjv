@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Work Log — Automation2</title>
+<title>Work Log — Automation</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -277,6 +277,9 @@ select option{background:var(--surface2)}
   <div class="nav-item active" onclick="switchPage('table')" data-page="table">
     <span class="nav-icon">📋</span>ตารางงาน
   </div>
+  <div class="nav-item" onclick="switchPage('requisition')" data-page="requisition">
+    <span class="nav-icon">📦</span>เบิกของ
+  </div>
   <div class="nav-item" onclick="switchPage('manpower')" data-page="manpower">
     <span class="nav-icon">👥</span>Manpower
   </div>
@@ -368,6 +371,106 @@ select option{background:var(--surface2)}
         </thead>
         <tbody id="logBody">
           <tr><td colspan="13" class="empty-state"><div class="ico">📊</div>ยังไม่มีข้อมูล</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PAGE: เบิกของ ══ -->
+<div class="page" id="page-requisition">
+  <div class="topbar">
+    <div class="page-title">📦 เบิกของ <span>Material Requisition</span></div>
+    <div class="topbar-right">
+      <button class="copy-btn" id="copyReqAllBtn" onclick="copyReqAll()" style="padding:7px 14px;font-size:13px">📋 Copy ทั้งหมด</button>
+      <button class="btn sm green" onclick="saveAllToDB()">💾 บันทึก</button>
+    </div>
+  </div>
+  <div style="padding:20px 24px">
+
+    <!-- Import Item Master -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="pool-header" onclick="toggleItemPool()">
+        <div class="card-title" style="margin-bottom:0">
+          <span class="dot"></span>ไฟล์ Item Master
+          <span class="badge day" id="itemMasterCount" style="margin-left:6px">0 รายการ</span>
+        </div>
+        <span id="itemPoolIcon" style="color:var(--text3);font-size:12px">▶ เปิดดูรายการ</span>
+      </div>
+
+      <!-- upload row always visible -->
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px">
+        <label class="btn sm" for="fileItemMaster">⬆ Upload Excel</label>
+        <input type="file" id="fileItemMaster" accept=".xlsx,.xls" onchange="loadItemMasterFile(this)">
+        <div class="file-status" id="itemMasterStatus"><span class="dot-status"></span>ยังไม่ได้โหลด</div>
+        <div style="font-size:11px;color:var(--text3)">Columns: <strong>Item, Description, Default Bin, Current Balance, Average Cost, Unit Current</strong></div>
+      </div>
+
+      <!-- collapsible pool body -->
+      <div class="pool-body" id="itemPoolBody" style="margin-top:14px">
+        <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+          <input type="text" id="itemSearchQ" placeholder="🔍 ค้นหา Item # หรือ Description..."
+            oninput="renderItemPool()" style="flex:1;font-size:13px">
+          <span id="itemPoolCount" style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;white-space:nowrap"></span>
+        </div>
+        <div style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm)">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:700px">
+            <thead>
+              <tr>
+                <th style="background:var(--surface2);color:var(--text3);padding:8px 10px;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border);font-family:'Inter',sans-serif;font-weight:600;position:sticky;top:0;text-align:left">#</th>
+                <th style="background:var(--surface2);color:var(--accent);padding:8px 10px;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border);font-family:'Inter',sans-serif;font-weight:600;position:sticky;top:0;text-align:left">Item #</th>
+                <th style="background:var(--surface2);color:var(--text3);padding:8px 10px;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border);font-family:'Inter',sans-serif;font-weight:600;position:sticky;top:0;text-align:left">Description</th>
+                <th style="background:var(--surface2);color:var(--text3);padding:8px 10px;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border);font-family:'Inter',sans-serif;font-weight:600;position:sticky;top:0;text-align:left">Default Bin</th>
+                <th style="background:var(--surface2);color:var(--green);padding:8px 10px;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border);font-family:'Inter',sans-serif;font-weight:600;position:sticky;top:0;text-align:right">Balance</th>
+                <th style="background:var(--surface2);color:var(--accent);padding:8px 10px;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border);font-family:'Inter',sans-serif;font-weight:600;position:sticky;top:0;text-align:right">Avg Cost</th>
+                <th style="background:var(--surface2);color:var(--text3);padding:8px 10px;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border);font-family:'Inter',sans-serif;font-weight:600;position:sticky;top:0;text-align:left">Unit</th>
+              </tr>
+            </thead>
+            <tbody id="itemPoolRows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Row Toolbar -->
+    <div class="toolbar">
+      <label>วันที่:</label>
+      <input type="date" id="reqDate">
+      <button class="btn blue" onclick="addReqRow()">✏️ เพิ่มแถวเบิก</button>
+      <!-- Filter -->
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+        <label style="font-size:13px;color:var(--text2);font-weight:600">กรองวันที่:</label>
+        <input type="date" id="reqFilterFrom" onchange="renderReqTable()" style="font-size:13px;padding:6px 10px">
+        <span style="color:var(--text3)">–</span>
+        <input type="date" id="reqFilterTo" onchange="renderReqTable()" style="font-size:13px;padding:6px 10px">
+        <button class="btn ghost sm" onclick="clearReqFilters()">✖</button>
+        <span id="reqCount" style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace"></span>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table id="reqTable">
+        <thead>
+          <tr>
+            <th style="color:var(--accent)">#</th>
+            <th style="color:var(--accent)">Day</th>
+            <th style="color:var(--accent)">Date</th>
+            <th style="color:var(--accent)">Work Order</th>
+            <th style="color:var(--accent)">Description (งาน)</th>
+            <th style="color:var(--blue)">Item #</th>
+            <th style="color:var(--blue)">Description (Item)</th>
+            <th style="color:var(--blue)">IS# Number</th>
+            <th style="color:var(--blue)">Default Bin</th>
+            <th style="color:var(--blue)">Current Balance</th>
+            <th style="color:var(--purple)">จำนวนเบิก</th>
+            <th style="color:var(--green)">คงเหลือ</th>
+            <th style="color:var(--blue)">Average Cost</th>
+            <th style="color:var(--blue)">Unit Current</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="reqBody">
+          <tr><td colspan="13" class="empty-state"><div class="ico">📦</div>ยังไม่มีรายการเบิก</td></tr>
         </tbody>
       </table>
     </div>
@@ -541,7 +644,7 @@ const DEPT='Automation';
 const API='http://localhost:3001/api';
 
 /* ══ STATE ══ */
-let jvData=[],descData=[],manualDescs=[],logRows=[],shiftData={},otData=[];
+let jvData=[],descData=[],manualDescs=[],logRows=[],shiftData={},otData=[],reqRows=[],itemMaster=[];
 let filterPersons=new Set();
 let dbConnected=false;
 
@@ -585,6 +688,8 @@ function saveToLocalStorage(){
   localStorage.setItem('worklog_descData',JSON.stringify(descData));
   localStorage.setItem('worklog_manualDescs',JSON.stringify(manualDescs));
   localStorage.setItem('worklog_otData',JSON.stringify(otData));
+  localStorage.setItem('worklog_reqRows',JSON.stringify(reqRows));
+  localStorage.setItem('worklog_itemMaster',JSON.stringify(itemMaster));
   const ss={};
   Object.entries(shiftData).forEach(([k,v])=>{ss[k]=k.endsWith('_raw')?v:[...v];});
   localStorage.setItem('worklog_shiftData',JSON.stringify(ss));
@@ -596,6 +701,8 @@ function loadFromLocalStorage(){
     const d=localStorage.getItem('worklog_descData');if(d)descData=JSON.parse(d);
     const m=localStorage.getItem('worklog_manualDescs');if(m)manualDescs=JSON.parse(m);
     const o=localStorage.getItem('worklog_otData');if(o)otData=JSON.parse(o);
+    const rq=localStorage.getItem('worklog_reqRows');if(rq)reqRows=JSON.parse(rq);
+    const im=localStorage.getItem('worklog_itemMaster');if(im){itemMaster=JSON.parse(im);updateItemMasterUI();}
     const s=localStorage.getItem('worklog_shiftData');
     if(s){
       const p=JSON.parse(s);shiftData={};
@@ -606,7 +713,7 @@ function loadFromLocalStorage(){
 }
 function renderAll(){
   renderTable();renderPool();renderManpower();updateManpowerMonths();
-  updateShiftFilterMonths();updateOTMonths();renderOT();updateInfo();
+  updateShiftFilterMonths();updateOTMonths();renderOT();updateInfo();renderReqTable();
 }
 
 /* ══ NAVIGATION ══ */
@@ -616,6 +723,7 @@ function switchPage(p){
   if(p==='manpower')renderManpower();
   if(p==='shift')renderShiftTab();
   if(p==='ot')renderOT();
+  if(p==='requisition')renderReqTable();
 }
 
 /* ══ COST SPLIT ══ */
@@ -1221,16 +1329,16 @@ function renderShiftTab(){
 /* ══ CLEAR / EXPORT / IMPORT ══ */
 function clearAllData(){
   if(!confirm('⚠ ล้างข้อมูลทั้งหมด?\nไม่สามารถกู้คืนได้'))return;
-  logRows=[];jvData=[];descData=[];manualDescs=[];shiftData={};otData=[];
-  ['worklog_rows','worklog_jvData','worklog_descData','worklog_manualDescs','worklog_shiftData','worklog_otData'].forEach(k=>localStorage.removeItem(k));
+  logRows=[];jvData=[];descData=[];manualDescs=[];shiftData={};otData=[];reqRows=[];itemMaster=[];
+  ['worklog_rows','worklog_jvData','worklog_descData','worklog_manualDescs','worklog_shiftData','worklog_otData','worklog_reqRows','worklog_itemMaster'].forEach(k=>localStorage.removeItem(k));
   renderAll();
-  ['jvFileName','descFileName','shiftFileName'].forEach(id=>{document.getElementById(id).innerHTML=`<span class="dot-status"></span>ยังไม่ได้โหลด`;document.getElementById(id).className='file-status';});
+  ['jvFileName','descFileName','shiftFileName','itemMasterStatus'].forEach(id=>{const el=document.getElementById(id);if(el){el.innerHTML=`<span class="dot-status"></span>ยังไม่ได้โหลด`;el.className='file-status';}});
   document.getElementById('shiftPreview').innerHTML='';
   alert('✅ ล้างข้อมูลทั้งหมดเรียบร้อย');
 }
 function exportData(){
   const ss={};Object.entries(shiftData).forEach(([k,v])=>{ss[k]=k.endsWith('_raw')?v:[...v];});
-  const blob=new Blob([JSON.stringify({logRows,jvData,descData,manualDescs,shiftData:ss,otData},null,2)],{type:'application/json'});
+  const blob=new Blob([JSON.stringify({logRows,jvData,descData,manualDescs,shiftData:ss,otData,reqRows,itemMaster},null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download=`worklog_${new Date().toISOString().slice(0,10)}.json`;a.click();
 }
@@ -1245,6 +1353,8 @@ function importData(input){
       if(obj.descData)descData=obj.descData;
       if(obj.manualDescs)manualDescs=obj.manualDescs;
       if(obj.otData)otData=obj.otData;
+      if(obj.reqRows)reqRows=obj.reqRows;
+      if(obj.itemMaster){itemMaster=obj.itemMaster;updateItemMasterUI();}
       if(obj.shiftData){shiftData={};Object.entries(obj.shiftData).forEach(([k,v])=>{shiftData[k]=k.endsWith('_raw')?v:new Set(v);});}
       renderAll();
       setFileStatus('jvFileName',`JSON (${jvData.length} รายการ)`);
@@ -1255,11 +1365,274 @@ function importData(input){
   reader.readAsText(file);
 }
 
+/* ══ REQUISITION ══ */
+function loadItemMasterFile(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const wb=XLSX.read(e.target.result,{type:'binary'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const data=XLSX.utils.sheet_to_json(ws,{defval:''});
+    itemMaster=data.map(r=>({
+      item:     String(r['Item']||r['item']||r['ITEM']||'').trim(),
+      desc:     String(r['Description']||r['description']||'').trim(),
+      bin:      String(r['Default Bin']||r['default bin']||r['DefaultBin']||'').trim(),
+      balance:  r['Current Balance']||r['current balance']||r['CurrentBalance']||'',
+      avgCost:  r['Average Cost']||r['average cost']||r['AverageCost']||'',
+      unit:     String(r['Unit Current']||r['unit current']||r['UnitCurrent']||'').trim(),
+    })).filter(r=>r.item);
+    updateItemMasterUI();
+    autoSave();
+  };
+  reader.readAsBinaryString(file);
+}
+
+function toggleItemPool(){
+  const b=document.getElementById('itemPoolBody');
+  const i=document.getElementById('itemPoolIcon');
+  const open=b.classList.toggle('open');
+  i.textContent=open?'▼ ปิด':'▶ เปิดดูรายการ';
+  if(open)renderItemPool();
+}
+
+function renderItemPool(){
+  const q=(document.getElementById('itemSearchQ')?.value||'').trim().toLowerCase();
+  const rows=document.getElementById('itemPoolRows');
+  if(!rows)return;
+  const filtered=q
+    ?itemMaster.filter(it=>it.item.toLowerCase().includes(q)||it.desc.toLowerCase().includes(q)||it.bin.toLowerCase().includes(q))
+    :itemMaster;
+  const cnt=document.getElementById('itemPoolCount');
+  if(cnt)cnt.textContent=`${filtered.length} / ${itemMaster.length}`;
+  if(!filtered.length){
+    rows.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text3)">ไม่พบรายการ</td></tr>`;
+    return;
+  }
+  rows.innerHTML=filtered.slice(0,200).map((it,i)=>`
+    <tr style="border-bottom:1px solid var(--border);cursor:pointer" onclick="fillItemFromPool('${esc(it.item)}')"
+      onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+      <td style="padding:6px 10px;color:var(--text3);font-size:10px">${i+1}</td>
+      <td style="padding:6px 10px"><span class="badge jv">${esc(it.item)}</span></td>
+      <td style="padding:6px 10px;font-size:12px;max-width:220px">${esc(it.desc)}</td>
+      <td style="padding:6px 10px;font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--text2)">${esc(it.bin)||'–'}</td>
+      <td style="padding:6px 10px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--green)">${it.balance!==''?it.balance:'–'}</td>
+      <td style="padding:6px 10px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent)">${it.avgCost!==''?Number(it.avgCost).toLocaleString('th-TH',{minimumFractionDigits:2}):'–'}</td>
+      <td style="padding:6px 10px"><span class="badge dept" style="font-size:10px">${esc(it.unit)||'–'}</span></td>
+    </tr>`).join('');
+  if(filtered.length>200){
+    rows.innerHTML+=`<tr><td colspan="7" style="text-align:center;padding:10px;color:var(--text3);font-size:11px">แสดง 200 รายการแรก — พิมพ์ค้นหาเพื่อกรอง</td></tr>`;
+  }
+}
+
+/* เมื่อคลิกรายการใน pool — เพิ่มแถวใหม่พร้อม fill item ทันที */
+function fillItemFromPool(itemNo){
+  const dateVal=document.getElementById('reqDate').value||new Date().toISOString().slice(0,10);
+  const dayNames=['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัส','ศุกร์','เสาร์'];
+  const it=itemMaster.find(x=>x.item===itemNo);
+  if(!it)return;
+  reqRows.push({
+    id:Date.now(), date:dateVal,
+    dayName:dayNames[new Date(dateVal).getDay()],
+    workOrder:'', jobDesc:'',
+    itemNo:it.item, itemDesc:it.desc,
+    isNo:'', bin:it.bin, balance:it.balance, avgCost:it.avgCost, unit:it.unit, qty:''
+  });
+  renderReqTable();autoSave();
+  // สลับไปหน้าตารางเบิก
+  switchPage('requisition');
+  // scroll ตารางลงล่างสุด
+  setTimeout(()=>{
+    const wrap=document.getElementById('reqTable')?.closest('.table-wrap');
+    if(wrap)wrap.scrollTop=wrap.scrollHeight;
+  },80);
+}
+
+function updateItemMasterUI(){
+  const cnt=document.getElementById('itemMasterCount');
+  if(cnt)cnt.textContent=itemMaster.length+' รายการ';
+  const st=document.getElementById('itemMasterStatus');
+  if(st&&itemMaster.length>0){
+    st.innerHTML=`<span class="dot-status ok"></span>โหลดแล้ว ${itemMaster.length} รายการ`;
+    st.className='file-status ok';
+  }
+  renderItemPool();
+}
+
+function findItem(itemNo){
+  const q=String(itemNo).trim().toLowerCase();
+  return itemMaster.filter(i=>i.item.toLowerCase().includes(q));
+}
+
+function addReqRow(){
+  const dateVal=document.getElementById('reqDate').value||new Date().toISOString().slice(0,10);
+  const dayNames=['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัส','ศุกร์','เสาร์'];
+  reqRows.push({
+    id:Date.now(), date:dateVal,
+    dayName:dayNames[new Date(dateVal).getDay()],
+    workOrder:'', jobDesc:'',
+    itemNo:'', itemDesc:'', isNo:'',
+    bin:'', balance:'', avgCost:'', unit:'', qty:''
+  });
+  renderReqTable();
+  setTimeout(()=>{
+    const wrap=document.querySelector('#reqTable').closest('.table-wrap');
+    if(wrap)wrap.scrollTop=wrap.scrollHeight;
+  },50);
+}
+
+function updateReqItem(idx, itemNo){
+  reqRows[idx].itemNo=itemNo;
+  const matches=findItem(itemNo);
+  if(matches.length===1){
+    // auto-fill ถ้าตรงพอดี 1 รายการ
+    reqRows[idx].itemDesc=matches[0].desc;
+    reqRows[idx].bin=matches[0].bin;
+    reqRows[idx].balance=matches[0].balance;
+    reqRows[idx].avgCost=matches[0].avgCost;
+    reqRows[idx].unit=matches[0].unit;
+    renderReqTable();
+  } else if(matches.length>1){
+    // แสดง dropdown suggestion
+    showItemSuggest(idx, matches, itemNo);
+  }
+  autoSave();
+}
+
+function applyItem(idx, itemIdx){
+  const items=findItem(reqRows[idx].itemNo);
+  if(!items[itemIdx])return;
+  const it=items[itemIdx];
+  reqRows[idx].itemNo=it.item;
+  reqRows[idx].itemDesc=it.desc;
+  reqRows[idx].bin=it.bin;
+  reqRows[idx].balance=it.balance;
+  reqRows[idx].avgCost=it.avgCost;
+  reqRows[idx].unit=it.unit;
+  renderReqTable();autoSave();
+}
+
+function showItemSuggest(idx, matches, q){
+  // ใส่ popup suggest ใน cell
+  const cellId=`suggest-${idx}`;
+  const el=document.getElementById(cellId);
+  if(!el)return;
+  el.innerHTML=`<div style="position:relative">
+    <input type="text" value="${esc(q)}" placeholder="Item #"
+      oninput="updateReqItem(${idx},this.value)"
+      onblur="setTimeout(()=>{const s=document.getElementById('slist-${idx}');if(s)s.remove();},200)"
+      style="width:100px;font-size:12px">
+    <div id="slist-${idx}" style="position:absolute;top:100%;left:0;z-index:999;background:var(--surface);border:1px solid var(--border2);border-radius:6px;min-width:280px;max-height:160px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.4)">
+      ${matches.slice(0,10).map((it,i)=>`
+        <div onmousedown="applyItem(${idx},${i})"
+          style="padding:7px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)"
+          onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+          <span class="badge jv" style="margin-right:6px">${esc(it.item)}</span>${esc(it.desc)}
+          <span style="color:var(--text3);font-size:10px;margin-left:6px">[${esc(it.bin)}]</span>
+        </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+function deleteReqRow(idx){
+  if(!confirm('ลบแถวนี้?'))return;
+  reqRows.splice(idx,1);renderReqTable();autoSave();
+}
+
+function clearReqFilters(){
+  document.getElementById('reqFilterFrom').value='';
+  document.getElementById('reqFilterTo').value='';
+  renderReqTable();
+}
+
+function getFilteredReqRows(){
+  const from=document.getElementById('reqFilterFrom')?.value||'';
+  const to=document.getElementById('reqFilterTo')?.value||'';
+  return reqRows.map((row,idx)=>({row,idx})).filter(({row})=>{
+    if(from&&row.date<from)return false;
+    if(to&&row.date>to)return false;
+    return true;
+  });
+}
+
+function renderReqTable(){
+  const tbody=document.getElementById('reqBody');
+  if(!tbody)return;
+  if(!reqRows.length){
+    tbody.innerHTML=`<tr><td colspan="13" class="empty-state"><div class="ico">📦</div>ยังไม่มีรายการเบิก — กด "เพิ่มแถวเบิก"</td></tr>`;
+    const rc=document.getElementById('reqCount');if(rc)rc.textContent='';
+    return;
+  }
+  const filtered=getFilteredReqRows();
+  const rc=document.getElementById('reqCount');
+  if(rc)rc.textContent=`${filtered.length} / ${reqRows.length} แถว`;
+  if(!filtered.length){
+    tbody.innerHTML=`<tr><td colspan="13" class="empty-state"><div class="ico">🔍</div>ไม่พบข้อมูลที่ตรงกับตัวกรอง</td></tr>`;
+    return;
+  }
+  tbody.innerHTML=filtered.map(({row,idx})=>{
+    const balance=parseFloat(row.balance)||0;
+    const qty=parseFloat(row.qty)||0;
+    const remaining=row.balance!==''?(balance-qty):null;
+    const remColor=remaining===null?'var(--text3)':remaining<0?'var(--red)':remaining===0?'var(--accent)':'var(--green)';
+    const remText=remaining===null?'–':remaining.toLocaleString('th-TH',{maximumFractionDigits:4});
+    return`<tr>
+      <td style="color:var(--text3);font-size:11px;font-family:'JetBrains Mono',monospace;text-align:center">${idx+1}</td>
+      <td><span class="badge day">${row.dayName||''}</span></td>
+      <td><span class="badge date">${row.date}</span></td>
+      <td><input type="text" value="${esc(row.workOrder)}" placeholder="WO-XXXX"
+        onchange="reqRows[${idx}].workOrder=this.value;autoSave()" style="width:90px"></td>
+      <td><input type="text" value="${esc(row.jobDesc)}" placeholder="Description งาน"
+        onchange="reqRows[${idx}].jobDesc=this.value;autoSave()" style="min-width:150px"></td>
+      <td id="suggest-${idx}">
+        <input type="text" value="${esc(row.itemNo)}" placeholder="Item #"
+          oninput="updateReqItem(${idx},this.value)"
+          style="width:100px;font-size:12px;font-family:'JetBrains Mono',monospace">
+      </td>
+      <td style="font-size:12px;max-width:180px;white-space:normal">
+        ${row.itemDesc?`<span style="color:var(--text)">${esc(row.itemDesc)}</span>`:`<span style="color:var(--text3)">–</span>`}
+      </td>
+      <td><input type="text" value="${esc(row.isNo)}" placeholder="IS#"
+        onchange="reqRows[${idx}].isNo=this.value;autoSave()" style="width:80px;font-family:'JetBrains Mono',monospace;font-size:12px"></td>
+      <td><span style="font-size:12px;color:var(--text2);font-family:'JetBrains Mono',monospace">${esc(row.bin)||'–'}</span></td>
+      <td style="text-align:right"><span style="font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text2)">${row.balance!==''?Number(row.balance).toLocaleString('th-TH',{maximumFractionDigits:4}):'–'}</span></td>
+      <td>
+        <input type="number" min="0" step="1" value="${row.qty||''}" placeholder="0"
+          onchange="reqRows[${idx}].qty=this.value;renderReqTable();autoSave()"
+          style="width:70px;text-align:center;font-size:13px;font-family:'JetBrains Mono',monospace;border-color:var(--purple);color:var(--purple);font-weight:700">
+      </td>
+      <td style="text-align:right">
+        <span style="font-size:13px;font-family:'JetBrains Mono',monospace;font-weight:700;color:${remColor}">${remText}</span>
+        ${remaining!==null&&remaining<0?`<div style="font-size:10px;color:var(--red);font-weight:700">⚠ เกิน!</div>`:''}
+      </td>
+      <td style="text-align:right"><span style="font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--accent)">${row.avgCost!==''?Number(row.avgCost).toLocaleString('th-TH',{minimumFractionDigits:2}):'–'}</span></td>
+      <td><span class="badge dept" style="font-size:11px">${esc(row.unit)||'–'}</span></td>
+      <td><button class="btn sm red icon" onclick="deleteReqRow(${idx})">🗑</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function copyReqAll(){
+  const filtered=getFilteredReqRows();
+  if(!filtered.length){alert('ไม่มีข้อมูล');return;}
+  const lines=filtered.map(({row,idx})=>{
+    const balance=parseFloat(row.balance)||0;
+    const qty=parseFloat(row.qty)||0;
+    const remaining=row.balance!==''?(balance-qty):'';
+    return`${idx+1}\t${row.dayName||''}\t${row.date}\t${row.workOrder||''}\t${row.jobDesc||''}\t${row.itemNo||''}\t${row.itemDesc||''}\t${row.isNo||''}\t${row.bin||''}\t${row.balance||''}\t${row.qty||''}\t${remaining}\t${row.avgCost||''}\t${row.unit||''}`;
+  });
+  navigator.clipboard.writeText(lines.join('\n')).then(()=>{
+    const btn=document.getElementById('copyReqAllBtn');
+    const orig=btn.innerHTML;btn.innerHTML='✅ Copied!';btn.classList.add('copied');
+    setTimeout(()=>{btn.innerHTML=orig;btn.classList.remove('copied');},2000);
+  }).catch(()=>alert('Copy ไม่ได้'));
+}
+
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 /* ══ INIT ══ */
 document.getElementById('pickDate').value=new Date().toISOString().slice(0,10);
 document.getElementById('otDate').value=new Date().toISOString().slice(0,10);
+document.getElementById('reqDate').value=new Date().toISOString().slice(0,10);
 // โหลด salary settings จาก localStorage
 try{
   const savedSalary=localStorage.getItem('worklog_salary');
