@@ -265,6 +265,23 @@ select option{background:var(--surface2)}
 </head>
 <body>
 
+<!-- ══ ITEM PICKER MODAL ══ -->
+<div id="itemPickerModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.7);align-items:center;justify-content:center" onclick="if(event.target===this)closeItemPicker()">
+  <div style="background:var(--surface);border:1px solid var(--border2);border-radius:12px;width:680px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+      <span style="font-size:16px;font-weight:700;color:var(--text)">🔍 เลือก Item</span>
+      <input id="pickerSearch" type="text" placeholder="พิมพ์ค้นหา Item # หรือ Description..."
+        oninput="renderPickerList(this.value)"
+        style="flex:1;font-size:14px;padding:8px 12px">
+      <button class="btn sm" onclick="closeItemPicker()">✕ ปิด</button>
+    </div>
+    <div style="padding:8px 14px;font-size:11px;color:var(--text3);border-bottom:1px solid var(--border);display:grid;grid-template-columns:110px 1fr 80px 70px;gap:8px">
+      <span>ITEM #</span><span>DESCRIPTION</span><span>BIN</span><span style="text-align:right">BALANCE</span>
+    </div>
+    <div id="pickerList" style="overflow-y:auto;flex:1;min-height:200px"></div>
+  </div>
+</div>
+
 <!-- ══ SIDEBAR ══ -->
 <div id="sidebar">
   <div class="sidebar-logo">
@@ -633,6 +650,27 @@ select option{background:var(--surface2)}
   </div>
   <div style="padding:20px 24px">
     <div class="import-grid">
+      <!-- Gist DB Card -->
+      <div class="import-card" style="border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.05)">
+        <h4 style="color:var(--accent)">☁ GitHub Gist Database</h4>
+        <p>ซิงค์ข้อมูลออนไลน์ผ่าน GitHub Gist<br>
+        <a href="https://gist.github.com" target="_blank" style="color:var(--blue);font-size:11px">สร้าง Gist ใหม่ →</a> |
+        <a href="https://github.com/settings/tokens" target="_blank" style="color:var(--blue);font-size:11px">สร้าง Token →</a></p>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div>
+            <div style="font-size:11px;color:var(--text3);margin-bottom:3px">Gist ID</div>
+            <input type="text" id="gistId" placeholder="abc123def456..." style="width:100%;font-size:12px;font-family:'JetBrains Mono',monospace">
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text3);margin-bottom:3px">Personal Access Token (gist scope)</div>
+            <input type="password" id="gistToken" placeholder="ghp_xxxx..." style="width:100%;font-size:12px;font-family:'JetBrains Mono',monospace">
+          </div>
+          <button class="btn sm primary" onclick="saveGistConfig()" style="margin-top:4px">💾 บันทึกและทดสอบ</button>
+          <button class="btn sm" onclick="debugGist()" style="margin-top:4px">🔬 Debug Test</button>
+        </div>
+        <div id="gistDebugLog" style="font-size:11px;color:var(--text3);margin-top:8px;font-family:'JetBrains Mono',monospace;white-space:pre-wrap;max-height:120px;overflow-y:auto"></div>
+        <div style="font-size:10px;color:var(--text3);margin-top:4px">⚠ Token เก็บใน LocalStorage ของเครื่องคุณเท่านั้น</div>
+      </div>
       <div class="import-card">
         <h4>📂 JV Cost File</h4>
         <p>Columns: <strong>JV, Cost</strong></p>
@@ -697,44 +735,140 @@ const SP_TARGETS=[203000,206000,255000,273000,231000];
 const SP_MAX_OVER=30000; // เกิน SP ได้ไม่เกิน 30000
 const MONTH_NAMES=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 const DEPT='Automation';
-const API='http://localhost:3001/api';
 
 /* ══ STATE ══ */
 let jvData=[],descData=[],manualDescs=[],logRows=[],shiftData={},otData=[],reqRows=[],itemMaster=[],recvRows=[];
 let filterPersons=new Set();
 let dbConnected=false;
+let GIST_ID='',GIST_TOKEN='';
 
-/* ══ DB ══ */
+/* ══ GITHUB GIST DB ══ */
+async function debugGist(){
+  const log=document.getElementById('gistDebugLog');
+  const id=document.getElementById('gistId')?.value.trim()||GIST_ID;
+  const token=document.getElementById('gistToken')?.value.trim()||GIST_TOKEN;
+  if(!log)return;
+  log.textContent='⏳ กำลังทดสอบ...\n';
+  if(!id){log.textContent+='❌ ไม่มี Gist ID\n';return;}
+  if(!token){log.textContent+='❌ ไม่มี Token\n';return;}
+  log.textContent+=`Gist ID: ${id}\n`;
+  log.textContent+=`Token: ${token.slice(0,8)}...(${token.length} chars)\n`;
+  // 1) ทดสอบ user endpoint ก่อน
+  try{
+    const r=await fetch('https://api.github.com/user',{
+      headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.github.v3+json'}
+    });
+    const txt=await r.text();
+    log.textContent+=`\n/user → ${r.status} ${r.statusText}\n`;
+    if(r.ok){
+      const u=JSON.parse(txt);
+      log.textContent+=`✅ Login as: ${u.login}\n`;
+    } else {
+      log.textContent+=`❌ Response: ${txt.slice(0,200)}\n`;
+      if(r.status===401)log.textContent+=`\n💡 Token อาจหมดอายุหรือถูก revoke\nลองสร้าง Token ใหม่ที่ github.com/settings/tokens\n`;
+      return;
+    }
+  }catch(e){
+    log.textContent+=`❌ Network error: ${e.message}\n`;
+    log.textContent+=`💡 ถ้าใช้ file:// browser อาจ block CORS\nลองเปิดไฟล์ผ่าน Live Server หรือ http://localhost แทน\n`;
+    return;
+  }
+  // 2) ทดสอบ Gist endpoint
+  try{
+    const r2=await fetch(`https://api.github.com/gists/${id}`,{
+      headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.github.v3+json'}
+    });
+    log.textContent+=`\n/gists/${id} → ${r2.status} ${r2.statusText}\n`;
+    if(r2.ok){
+      const g=JSON.parse(await r2.text());
+      const files=Object.keys(g.files||{});
+      log.textContent+=`✅ Gist OK! Files: ${files.join(', ')||'(ว่าง)'}\n`;
+      log.textContent+=`\n✅ ทุกอย่างพร้อมใช้งาน!`;
+    } else if(r2.status===404){
+      log.textContent+=`❌ ไม่พบ Gist — ตรวจสอบ Gist ID อีกครั้ง\n`;
+    } else {
+      log.textContent+=`❌ Error: ${(await r2.text()).slice(0,200)}\n`;
+    }
+  }catch(e){
+    log.textContent+=`❌ Gist error: ${e.message}\n`;
+  }
+}
+
+function loadGistConfig(){
+  GIST_ID=localStorage.getItem('gist_id')||'';
+  GIST_TOKEN=localStorage.getItem('gist_token')||'';
+  const gi=document.getElementById('gistId');const gt=document.getElementById('gistToken');
+  if(gi)gi.value=GIST_ID;if(gt)gt.value=GIST_TOKEN;
+}
+function saveGistConfig(){
+  GIST_ID=document.getElementById('gistId')?.value.trim()||'';
+  GIST_TOKEN=document.getElementById('gistToken')?.value.trim()||'';
+  localStorage.setItem('gist_id',GIST_ID);
+  localStorage.setItem('gist_token',GIST_TOKEN);
+  setDBStatus(false,'⏳ กำลังทดสอบ...');
+  checkDB();
+}
 async function checkDB(){
+  loadGistConfig();
+  if(!GIST_ID||!GIST_TOKEN){setDBStatus(false,'⚠ ยังไม่ได้ตั้งค่า Gist');loadFromLocalStorage();return;}
   try{
-    const r=await fetch(`${API}/ping`,{signal:AbortSignal.timeout(2000)});
-    if(r.ok){dbConnected=true;setDBStatus(true);await loadFromDB();}
-    else setDBStatus(false);
-  }catch(e){setDBStatus(false);loadFromLocalStorage();}
+    const r=await fetch(`https://api.github.com/gists/${GIST_ID}`,{
+      headers:{Authorization:`Bearer ${GIST_TOKEN}`,Accept:'application/vnd.github.v3+json'},
+      signal:AbortSignal.timeout(6000)
+    });
+    if(r.ok){
+      dbConnected=true;setDBStatus(true,'✅ GitHub Gist');
+      await loadFromGist();
+    }else{
+      setDBStatus(false,`❌ Gist ${r.status}`);loadFromLocalStorage();
+    }
+  }catch(e){setDBStatus(false,'⚠ Offline — LocalStorage');loadFromLocalStorage();}
 }
-function setDBStatus(ok){
+function setDBStatus(ok,msg){
   const el=document.getElementById('dbStatus');
-  if(ok){el.textContent='✅ DB Connected';el.className='db-pill ok';}
-  else{el.textContent='⚠ LocalStorage Mode';el.className='db-pill err';}
+  if(!el)return;
+  el.textContent=msg||(ok?'✅ Gist':'⚠ LocalStorage');
+  el.className=`db-pill ${ok?'ok':'err'}`;
 }
-async function loadFromDB(){
+async function loadFromGist(){
   try{
-    const r=await fetch(`${API}/rows`);
-    logRows=await r.json()||[];
-    renderTable();renderManpower();updateManpowerMonths();
-  }catch(e){loadFromLocalStorage();}
+    const r=await fetch(`https://api.github.com/gists/${GIST_ID}`,{
+      headers:{Authorization:`Bearer ${GIST_TOKEN}`,Accept:'application/vnd.github.v3+json'}
+    });
+    const g=await r.json();
+    const file=g.files?.['worklog_data.json'];
+    if(file?.content){applyImportedData(JSON.parse(file.content));renderAll();}
+    else{loadFromLocalStorage();}
+  }catch(e){console.error('Gist load:',e);loadFromLocalStorage();}
 }
 async function saveAllToDB(){
-  if(!dbConnected){saveToLocalStorage();alert('บันทึกลง LocalStorage แล้ว');return;}
+  saveToLocalStorage();
+  if(!dbConnected||!GIST_ID||!GIST_TOKEN){alert('บันทึกลง LocalStorage แล้ว\n(ตั้งค่า Gist ในหน้า "ตั้งค่า/Import" เพื่อซิงค์ออนไลน์)');return;}
   try{
-    const r=await fetch(`${API}/rows`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logRows)});
-    if(r.ok)alert('✅ บันทึกลง DB สำเร็จ!');
-    else alert('❌ บันทึกไม่สำเร็จ');
-  }catch(e){saveToLocalStorage();alert('บันทึกลง LocalStorage แล้ว');}
+    const ss={};Object.entries(shiftData).forEach(([k,v])=>{ss[k]=k.endsWith('_raw')?v:[...v];});
+    const content=JSON.stringify({logRows,jvData,descData,manualDescs,shiftData:ss,otData,reqRows,itemMaster,recvRows},null,2);
+    const r=await fetch(`https://api.github.com/gists/${GIST_ID}`,{
+      method:'PATCH',
+      headers:{Authorization:`Bearer ${GIST_TOKEN}`,Accept:'application/vnd.github.v3+json','Content-Type':'application/json'},
+      body:JSON.stringify({files:{'worklog_data.json':{content}}})
+    });
+    if(r.ok)alert('✅ บันทึกลง GitHub Gist สำเร็จ!');
+    else alert(`❌ Gist Error ${r.status}`);
+  }catch(e){alert('บันทึกลง LocalStorage แล้ว ('+e.message+')');}
+}
+function applyImportedData(obj){
+  if(obj.logRows)logRows=obj.logRows;
+  if(obj.jvData)jvData=obj.jvData;
+  if(obj.descData)descData=obj.descData;
+  if(obj.manualDescs)manualDescs=obj.manualDescs;
+  if(obj.otData)otData=obj.otData;
+  if(obj.reqRows)reqRows=obj.reqRows;
+  if(obj.itemMaster){itemMaster=obj.itemMaster;updateItemMasterUI();}
+  if(obj.recvRows)recvRows=obj.recvRows;
+  if(obj.shiftData){shiftData={};Object.entries(obj.shiftData).forEach(([k,v])=>{shiftData[k]=k.endsWith('_raw')?v:new Set(v);});}
 }
 function autoSave(){
-  if(!dbConnected)saveToLocalStorage();
-  // บันทึก salary settings เสมอ
+  saveToLocalStorage();
   localStorage.setItem('worklog_salary',JSON.stringify(PERSONS.map(p=>({salary:p.salary,workHours:p.workHours}))));
 }
 
@@ -989,15 +1123,24 @@ function addDay(){
   const dateObj=new Date(dateVal);
   const dayNames=['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัส','ศุกร์','เสาร์'];
   const dayName=dayNames[dateObj.getDay()];
-  const active=PERSONS.filter(p=>!isPersonOff(p.name,dateVal));
+  const allActive=PERSONS.filter(p=>!isPersonOff(p.name,dateVal));
   const off=PERSONS.filter(p=>isPersonOff(p.name,dateVal));
-  if(!active.length){alert(`วันที่ ${dateVal} ทุกคนหยุด`);return;}
+  if(!allActive.length){alert(`วันที่ ${dateVal} ทุกคนหยุด`);return;}
   if(off.length>0){
-    if(!confirm(`⚠ ${off.map(p=>p.name).join(', ')} หยุด\nสุ่มให้ ${active.length} คน ใช่ไหม?`))return;
+    if(!confirm(`⚠ ${off.map(p=>p.name).join(', ')} หยุด\nสุ่มให้ ${allActive.length} คน ใช่ไหม?`))return;
   }
   const shuffled=[...validPool].sort(()=>Math.random()-.5);
   const picked=[];
-  for(let i=0;i<active.length*dpp;i++)picked.push(shuffled[i%shuffled.length]);
+  for(let i=0;i<allActive.length*dpp;i++)picked.push(shuffled[i%shuffled.length]);
+
+  // เรียงลำดับตามกะ d > a > n > ไม่มีกะ
+  const shiftOrder={d:0,a:1,n:2};
+  const getShift=name=>{
+    const raw=shiftData[name+'_raw']?.[dateVal]||'';
+    return shiftOrder[raw]??3;
+  };
+  const active=[...allActive].sort((a,b)=>getShift(a.name)-getShift(b.name));
+
   active.forEach((person,pIdx)=>{
     for(let d=0;d<dpp;d++){
       const item=picked[pIdx*dpp+d];
@@ -1406,16 +1549,7 @@ function importData(input){
   const reader=new FileReader();
   reader.onload=e=>{
     try{
-      const obj=JSON.parse(e.target.result);
-      if(obj.logRows)logRows=obj.logRows;
-      if(obj.jvData)jvData=obj.jvData;
-      if(obj.descData)descData=obj.descData;
-      if(obj.manualDescs)manualDescs=obj.manualDescs;
-      if(obj.otData)otData=obj.otData;
-      if(obj.reqRows)reqRows=obj.reqRows;
-      if(obj.itemMaster){itemMaster=obj.itemMaster;updateItemMasterUI();}
-      if(obj.recvRows)recvRows=obj.recvRows;
-      if(obj.shiftData){shiftData={};Object.entries(obj.shiftData).forEach(([k,v])=>{shiftData[k]=k.endsWith('_raw')?v:new Set(v);});}
+      applyImportedData(JSON.parse(e.target.result));
       renderAll();
       setFileStatus('jvFileName',`JSON (${jvData.length} รายการ)`);
       setFileStatus('descFileName',`JSON (${descData.length} รายการ)`);
@@ -1542,56 +1676,78 @@ function addReqRow(){
 
 function updateReqItem(idx, itemNo){
   reqRows[idx].itemNo=itemNo;
-  const matches=findItem(itemNo);
-  if(matches.length===1){
-    // auto-fill ถ้าตรงพอดี 1 รายการ
-    reqRows[idx].itemDesc=matches[0].desc;
-    reqRows[idx].bin=matches[0].bin;
-    reqRows[idx].balance=matches[0].balance;
-    reqRows[idx].avgCost=matches[0].avgCost;
-    reqRows[idx].unit=matches[0].unit;
+  // exact match → auto-fill ทันที
+  const exact=itemMaster.find(x=>x.item.toLowerCase()===itemNo.trim().toLowerCase());
+  if(exact){
+    reqRows[idx].itemDesc=exact.desc;reqRows[idx].bin=exact.bin;
+    reqRows[idx].balance=exact.balance;reqRows[idx].avgCost=exact.avgCost;reqRows[idx].unit=exact.unit;
     renderReqTable();
-  } else if(matches.length>1){
-    // แสดง dropdown suggestion
-    showItemSuggest(idx, matches, itemNo);
   }
   autoSave();
+}
+
+function openItemPicker(idx, type){
+  // type = 'req' | 'recv'
+  const modal=document.getElementById('itemPickerModal');
+  modal.dataset.idx=idx;modal.dataset.type=type;
+  const q=type==='req'?reqRows[idx]?.itemNo||'':recvRows[idx]?.itemNo||'';
+  document.getElementById('pickerSearch').value=q;
+  renderPickerList(q);
+  modal.style.display='flex';
+  setTimeout(()=>document.getElementById('pickerSearch').focus(),50);
+}
+function closeItemPicker(){
+  document.getElementById('itemPickerModal').style.display='none';
+}
+function renderPickerList(q){
+  const list=document.getElementById('pickerList');
+  const filtered=q.trim()
+    ?itemMaster.filter(it=>it.item.toLowerCase().includes(q.toLowerCase())||it.desc.toLowerCase().includes(q.toLowerCase()))
+    :itemMaster;
+  if(!filtered.length){
+    list.innerHTML=`<div style="padding:20px;text-align:center;color:var(--text3)">ไม่พบรายการ</div>`;return;
+  }
+  list.innerHTML=filtered.slice(0,100).map((it,i)=>`
+    <div onclick="selectItemFromPicker(${i},'${q.trim()}')"
+      style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);display:grid;grid-template-columns:110px 1fr 80px 70px;gap:8px;align-items:center"
+      onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+      <span class="badge jv" style="font-size:11px">${esc(it.item)}</span>
+      <span style="font-size:12px;color:var(--text)">${esc(it.desc)}</span>
+      <span style="font-size:11px;color:var(--text2);font-family:'JetBrains Mono',monospace">${esc(it.bin)}</span>
+      <span style="font-size:11px;color:var(--green);font-family:'JetBrains Mono',monospace;text-align:right">${it.balance!==''?it.balance:'–'}</span>
+    </div>`).join('');
+  if(filtered.length>100)list.innerHTML+=`<div style="padding:8px;text-align:center;color:var(--text3);font-size:11px">แสดง 100 แรก — พิมพ์เพื่อกรองเพิ่ม</div>`;
+}
+function selectItemFromPicker(listIdx, q){
+  const filtered=q.trim()
+    ?itemMaster.filter(it=>it.item.toLowerCase().includes(q.toLowerCase())||it.desc.toLowerCase().includes(q.toLowerCase()))
+    :itemMaster;
+  const it=filtered[listIdx];if(!it)return;
+  const modal=document.getElementById('itemPickerModal');
+  const idx=parseInt(modal.dataset.idx);
+  const type=modal.dataset.type;
+  if(type==='req'){
+    reqRows[idx].itemNo=it.item;reqRows[idx].itemDesc=it.desc;reqRows[idx].bin=it.bin;
+    reqRows[idx].balance=it.balance;reqRows[idx].avgCost=it.avgCost;reqRows[idx].unit=it.unit;
+    renderReqTable();
+  } else {
+    recvRows[idx].itemNo=it.item;recvRows[idx].itemDesc=it.desc;recvRows[idx].bin=it.bin;
+    recvRows[idx].balance=it.balance;recvRows[idx].avgCost=it.avgCost;recvRows[idx].unit=it.unit;
+    renderRecvTable();
+  }
+  autoSave();closeItemPicker();
 }
 
 function applyItem(idx, itemIdx){
   const items=findItem(reqRows[idx].itemNo);
   if(!items[itemIdx])return;
   const it=items[itemIdx];
-  reqRows[idx].itemNo=it.item;
-  reqRows[idx].itemDesc=it.desc;
-  reqRows[idx].bin=it.bin;
-  reqRows[idx].balance=it.balance;
-  reqRows[idx].avgCost=it.avgCost;
-  reqRows[idx].unit=it.unit;
+  reqRows[idx].itemNo=it.item;reqRows[idx].itemDesc=it.desc;reqRows[idx].bin=it.bin;
+  reqRows[idx].balance=it.balance;reqRows[idx].avgCost=it.avgCost;reqRows[idx].unit=it.unit;
   renderReqTable();autoSave();
 }
 
-function showItemSuggest(idx, matches, q){
-  // ใส่ popup suggest ใน cell
-  const cellId=`suggest-${idx}`;
-  const el=document.getElementById(cellId);
-  if(!el)return;
-  el.innerHTML=`<div style="position:relative">
-    <input type="text" value="${esc(q)}" placeholder="Item #"
-      oninput="updateReqItem(${idx},this.value)"
-      onblur="setTimeout(()=>{const s=document.getElementById('slist-${idx}');if(s)s.remove();},200)"
-      style="width:100px;font-size:12px">
-    <div id="slist-${idx}" style="position:absolute;top:100%;left:0;z-index:999;background:var(--surface);border:1px solid var(--border2);border-radius:6px;min-width:280px;max-height:160px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.4)">
-      ${matches.slice(0,10).map((it,i)=>`
-        <div onmousedown="applyItem(${idx},${i})"
-          style="padding:7px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)"
-          onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
-          <span class="badge jv" style="margin-right:6px">${esc(it.item)}</span>${esc(it.desc)}
-          <span style="color:var(--text3);font-size:10px;margin-left:6px">[${esc(it.bin)}]</span>
-        </div>`).join('')}
-    </div>
-  </div>`;
-}
+function showItemSuggest(idx, matches, q){ /* deprecated — ใช้ modal แทน */ }
 
 function deleteReqRow(idx){
   if(!confirm('ลบแถวนี้?'))return;
@@ -1645,10 +1801,13 @@ function renderReqTable(){
         onchange="reqRows[${idx}].workOrder=this.value;autoSave()" style="width:90px"></td>
       <td><input type="text" value="${esc(row.jobDesc)}" placeholder="Description งาน"
         onchange="reqRows[${idx}].jobDesc=this.value;autoSave()" style="min-width:150px"></td>
-      <td id="suggest-${idx}">
-        <input type="text" value="${esc(row.itemNo)}" placeholder="Item #"
-          oninput="updateReqItem(${idx},this.value)"
-          style="width:100px;font-size:12px;font-family:'JetBrains Mono',monospace">
+      <td id="suggest-${idx}" style="white-space:nowrap">
+        <div style="display:flex;gap:4px;align-items:center">
+          <input type="text" value="${esc(row.itemNo)}" placeholder="Item #"
+            onchange="updateReqItem(${idx},this.value)"
+            style="width:85px;font-size:12px;font-family:'JetBrains Mono',monospace">
+          <button class="copy-btn" onclick="openItemPicker(${idx},'req')" title="เลือก Item" style="padding:4px 7px">🔍</button>
+        </div>
       </td>
       <td style="font-size:12px;max-width:180px;white-space:normal">
         ${row.itemDesc?`<span style="color:var(--text)">${esc(row.itemDesc)}</span>`:`<span style="color:var(--text3)">–</span>`}
@@ -1742,31 +1901,13 @@ function addRecvRow(){
   },50);
 }
 
-/* ดึงข้อมูล item จาก itemMaster ตาม itemNo */
 function fillRecvItem(idx, itemNo){
   recvRows[idx].itemNo=itemNo;
-  const it=itemMaster.find(x=>x.item.toLowerCase()===itemNo.trim().toLowerCase());
-  if(it){
-    recvRows[idx].itemDesc=it.desc;
-    recvRows[idx].bin=it.bin;
-    recvRows[idx].balance=it.balance;
-    recvRows[idx].avgCost=it.avgCost;
-    recvRows[idx].unit=it.unit;
+  const exact=itemMaster.find(x=>x.item.toLowerCase()===itemNo.trim().toLowerCase());
+  if(exact){
+    recvRows[idx].itemDesc=exact.desc;recvRows[idx].bin=exact.bin;
+    recvRows[idx].balance=exact.balance;recvRows[idx].avgCost=exact.avgCost;recvRows[idx].unit=exact.unit;
     renderRecvTable();
-  } else {
-    // ค้นหาแบบ partial
-    const matches=itemMaster.filter(x=>x.item.toLowerCase().includes(itemNo.trim().toLowerCase()));
-    if(matches.length===1){
-      recvRows[idx].itemDesc=matches[0].desc;
-      recvRows[idx].bin=matches[0].bin;
-      recvRows[idx].balance=matches[0].balance;
-      recvRows[idx].avgCost=matches[0].avgCost;
-      recvRows[idx].unit=matches[0].unit;
-      recvRows[idx].itemNo=matches[0].item;
-      renderRecvTable();
-    } else if(matches.length>1){
-      showRecvItemSuggest(idx, matches);
-    }
   }
   autoSave();
 }
@@ -1863,10 +2004,13 @@ function renderRecvTable(){
       <td><input type="text" value="${esc(row.invoice)}" placeholder="INV-XXXX"
         onchange="recvRows[${idx}].invoice=this.value;autoSave()"
         style="width:90px;font-family:'JetBrains Mono',monospace;font-size:12px"></td>
-      <td id="recv-suggest-${idx}">
-        <input type="text" value="${esc(row.itemNo)}" placeholder="Item #"
-          oninput="fillRecvItem(${idx},this.value)"
-          style="width:100px;font-size:12px;font-family:'JetBrains Mono',monospace">
+      <td id="recv-suggest-${idx}" style="white-space:nowrap">
+        <div style="display:flex;gap:4px;align-items:center">
+          <input type="text" value="${esc(row.itemNo)}" placeholder="Item #"
+            onchange="fillRecvItem(${idx},this.value)"
+            style="width:85px;font-size:12px;font-family:'JetBrains Mono',monospace">
+          <button class="copy-btn" onclick="openItemPicker(${idx},'recv')" title="เลือก Item" style="padding:4px 7px">🔍</button>
+        </div>
       </td>
       <td style="font-size:12px;max-width:200px;white-space:normal">
         ${itemDesc?`<span style="color:var(--text)">${esc(itemDesc)}</span>`:`<span style="color:var(--text3)">–</span>`}
