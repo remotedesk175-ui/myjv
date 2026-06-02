@@ -316,6 +316,26 @@ select option{background:var(--surface2)}
   </div>
 
   <div class="sidebar-bottom">
+    <!-- Scheduled Auto-save -->
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.5px">⏰ SCHEDULED SAVE</span>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+          <span style="font-size:11px;color:var(--text3)">เปิด</span>
+          <div id="autoSaveToggle" onclick="toggleAutoSave()"
+            style="width:32px;height:18px;border-radius:9px;background:var(--border2);position:relative;cursor:pointer;transition:background .2s">
+            <div id="autoSaveThumb" style="width:14px;height:14px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left .2s"></div>
+          </div>
+        </label>
+      </div>
+      <!-- Time slots -->
+      <div id="saveSlots" style="display:flex;flex-direction:column;gap:5px;margin-bottom:8px"></div>
+      <div style="display:flex;gap:5px">
+        <input type="time" id="newSaveTime" style="flex:1;font-size:12px;padding:4px 6px;border-radius:5px">
+        <button class="btn sm blue" onclick="addSaveSlot()" style="padding:4px 10px;font-size:12px">＋</button>
+      </div>
+      <div id="autoSaveStatus" style="font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace;text-align:center;margin-top:6px;min-height:14px"></div>
+    </div>
     <button class="btn sm red" style="width:100%" onclick="clearAllData()">🗑 ล้างข้อมูลทั้งหมด</button>
   </div>
 </div>
@@ -870,6 +890,101 @@ function applyImportedData(obj){
 function autoSave(){
   saveToLocalStorage();
   localStorage.setItem('worklog_salary',JSON.stringify(PERSONS.map(p=>({salary:p.salary,workHours:p.workHours}))));
+}
+
+/* ══ SCHEDULED AUTO-SAVE ══ */
+let autoSaveEnabled=false;
+let saveSlots=[];        // ["16:00","17:00",...]
+let scheduleTimer=null;
+let lastFiredMinute=''; // ป้องกัน fire ซ้ำในนาทีเดียวกัน
+
+function initAutoSave(){
+  autoSaveEnabled=localStorage.getItem('autosave_enabled')==='true';
+  try{ saveSlots=JSON.parse(localStorage.getItem('autosave_slots')||'[]'); }catch(e){ saveSlots=[]; }
+  renderSaveSlots();
+  updateAutoSaveUI();
+  // tick ทุก 10 วิ ตรวจว่าถึงเวลาหรือยัง
+  scheduleTimer=setInterval(checkScheduledSave,10000);
+}
+
+function toggleAutoSave(){
+  autoSaveEnabled=!autoSaveEnabled;
+  localStorage.setItem('autosave_enabled',autoSaveEnabled);
+  updateAutoSaveUI();
+  const el=document.getElementById('autoSaveStatus');
+  if(el)el.textContent=autoSaveEnabled?'✅ เปิดแล้ว':'ปิดอยู่';
+}
+
+function addSaveSlot(){
+  const t=document.getElementById('newSaveTime')?.value;
+  if(!t){alert('กรุณาเลือกเวลา');return;}
+  if(saveSlots.includes(t)){alert('เพิ่มเวลานี้แล้ว');return;}
+  saveSlots.push(t);
+  saveSlots.sort();
+  localStorage.setItem('autosave_slots',JSON.stringify(saveSlots));
+  renderSaveSlots();
+  document.getElementById('newSaveTime').value='';
+}
+
+function removeSaveSlot(t){
+  saveSlots=saveSlots.filter(s=>s!==t);
+  localStorage.setItem('autosave_slots',JSON.stringify(saveSlots));
+  renderSaveSlots();
+}
+
+function renderSaveSlots(){
+  const el=document.getElementById('saveSlots');if(!el)return;
+  if(!saveSlots.length){
+    el.innerHTML=`<div style="font-size:11px;color:var(--text3);text-align:center;padding:4px 0">ยังไม่มีเวลาที่ตั้งไว้</div>`;
+    return;
+  }
+  el.innerHTML=saveSlots.map(t=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:4px 8px">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--accent)">🕐 ${t}</span>
+      <button onclick="removeSaveSlot('${t}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:0 2px;line-height:1">×</button>
+    </div>`).join('');
+}
+
+function checkScheduledSave(){
+  if(!autoSaveEnabled||!saveSlots.length)return;
+  const now=new Date();
+  const hhmm=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  if(saveSlots.includes(hhmm)&&lastFiredMinute!==hhmm){
+    lastFiredMinute=hhmm;
+    doScheduledSave(hhmm);
+  }
+}
+
+async function doScheduledSave(triggerTime){
+  const el=document.getElementById('autoSaveStatus');
+  if(el)el.textContent=`⏳ บันทึก ${triggerTime}...`;
+  autoSave(); // localStorage ก่อนเสมอ
+  if(dbConnected&&GIST_ID&&GIST_TOKEN){
+    try{
+      const ss={};Object.entries(shiftData).forEach(([k,v])=>{ss[k]=k.endsWith('_raw')?v:[...v];});
+      const content=JSON.stringify({logRows,jvData,descData,manualDescs,shiftData:ss,otData,reqRows,itemMaster,recvRows},null,2);
+      const r=await fetch(`https://api.github.com/gists/${GIST_ID}`,{
+        method:'PATCH',
+        headers:{Authorization:`Bearer ${GIST_TOKEN}`,Accept:'application/vnd.github.v3+json','Content-Type':'application/json'},
+        body:JSON.stringify({files:{'worklog_data.json':{content}}})
+      });
+      const now=new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+      if(el)el.textContent=r.ok?`✅ Gist บันทึก ${now}`:`⚠ Local บันทึก ${now}`;
+    }catch(e){
+      const now=new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+      if(el)el.textContent=`⚠ Local บันทึก ${now}`;
+    }
+  } else {
+    const now=new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+    if(el)el.textContent=`💾 Local บันทึก ${now}`;
+  }
+}
+
+function updateAutoSaveUI(){
+  const toggle=document.getElementById('autoSaveToggle');
+  const thumb=document.getElementById('autoSaveThumb');
+  if(toggle)toggle.style.background=autoSaveEnabled?'var(--green)':'var(--border2)';
+  if(thumb)thumb.style.left=autoSaveEnabled?'16px':'2px';
 }
 
 function saveToLocalStorage(){
@@ -2072,6 +2187,7 @@ try{
 initFilterPersonBtns();
 initOTPerson();
 initSalarySettings();
+initAutoSave();
 renderPool();
 renderManpower();
 updateShiftFilterMonths();
