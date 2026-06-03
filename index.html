@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Work Log — Automation</title>
+<title>Work Log — AutomationV0.2</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -350,6 +350,7 @@ select option{background:var(--surface2)}
       <div class="page-title">📋 ตารางงาน <span>Daily Job Log</span></div>
     </div>
     <div class="topbar-right">
+      <button class="btn sm" onclick="loadFromGist()" title="ดึงข้อมูลจาก GitHub Gist">☁ โหลดจาก Gist</button>
       <button class="btn sm green" onclick="saveAllToDB()">💾 บันทึก</button>
       <button class="btn sm" onclick="exportData()">📤 Export</button>
       <label class="btn sm" for="importJSON">📥 Import</label>
