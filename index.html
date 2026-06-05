@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Work Log — AutomationV0.2</title>
+<title>Work Log — Automation</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -336,6 +336,7 @@ select option{background:var(--surface2)}
       </div>
       <div id="autoSaveStatus" style="font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace;text-align:center;margin-top:6px;min-height:14px"></div>
     </div>
+    <button class="btn sm blue" style="width:100%;margin-bottom:6px" onclick="manualLoadGist()">⬇ ดึงข้อมูลจาก Gist</button>
     <button class="btn sm red" style="width:100%" onclick="clearAllData()">🗑 ล้างข้อมูลทั้งหมด</button>
   </div>
 </div>
@@ -351,6 +352,7 @@ select option{background:var(--surface2)}
     </div>
     <div class="topbar-right">
       <button class="btn sm" onclick="loadFromGist()" title="ดึงข้อมูลจาก GitHub Gist">☁ โหลดจาก Gist</button>
+      <button class="btn sm" onclick="loadFromGist()" title="ดึงข้อมูลล่าสุดจาก GitHub Gist">☁ โหลด Gist</button>
       <button class="btn sm green" onclick="saveAllToDB()">💾 บันทึก</button>
       <button class="btn sm" onclick="exportData()">📤 Export</button>
       <label class="btn sm" for="importJSON">📥 Import</label>
@@ -424,6 +426,7 @@ select option{background:var(--surface2)}
     <div class="page-title">📦 เบิกของ <span>Material Requisition</span></div>
     <div class="topbar-right">
       <button class="copy-btn" id="copyReqAllBtn" onclick="copyReqAll()" style="padding:7px 14px;font-size:13px">📋 Copy ทั้งหมด</button>
+      <button class="btn sm" onclick="loadFromGist()" title="ดึงข้อมูลล่าสุดจาก GitHub Gist">☁ โหลด Gist</button>
       <button class="btn sm green" onclick="saveAllToDB()">💾 บันทึก</button>
     </div>
   </div>
@@ -524,6 +527,7 @@ select option{background:var(--surface2)}
     <div class="page-title">📥 รับของ <span>Goods Receiving</span></div>
     <div class="topbar-right">
       <button class="copy-btn" id="copyRecvAllBtn" onclick="copyRecvAll()" style="padding:7px 14px;font-size:13px">📋 Copy ทั้งหมด</button>
+      <button class="btn sm" onclick="loadFromGist()" title="ดึงข้อมูลล่าสุดจาก GitHub Gist">☁ โหลด Gist</button>
       <button class="btn sm green" onclick="saveAllToDB()">💾 บันทึก</button>
     </div>
   </div>
@@ -687,7 +691,9 @@ select option{background:var(--surface2)}
             <input type="password" id="gistToken" placeholder="ghp_xxxx..." style="width:100%;font-size:12px;font-family:'JetBrains Mono',monospace">
           </div>
           <button class="btn sm primary" onclick="saveGistConfig()" style="margin-top:4px">💾 บันทึกและทดสอบ</button>
+          <button class="btn sm" onclick="manualLoadGist()" style="margin-top:4px">☁ โหลดข้อมูลจาก Gist</button>
           <button class="btn sm" onclick="debugGist()" style="margin-top:4px">🔬 Debug Test</button>
+          <button class="btn sm red" onclick="resetGist()" style="margin-top:4px">🔄 รีเซ็ต Gist</button>
         </div>
         <div id="gistDebugLog" style="font-size:11px;color:var(--text3);margin-top:8px;font-family:'JetBrains Mono',monospace;white-space:pre-wrap;max-height:120px;overflow-y:auto"></div>
         <div style="font-size:10px;color:var(--text3);margin-top:4px">⚠ Token เก็บใน LocalStorage ของเครื่องคุณเท่านั้น</div>
@@ -851,23 +857,116 @@ function setDBStatus(ok,msg){
   el.textContent=msg||(ok?'✅ Gist':'⚠ LocalStorage');
   el.className=`db-pill ${ok?'ok':'err'}`;
 }
-async function loadFromGist(){
-  try{
-    const r=await fetch(`https://api.github.com/gists/${GIST_ID}`,{
-      headers:{Authorization:`Bearer ${GIST_TOKEN}`,Accept:'application/vnd.github.v3+json'}
-    });
-    const g=await r.json();
-    const file=g.files?.['worklog_data.json'];
-    if(file?.content){applyImportedData(JSON.parse(file.content));renderAll();}
-    else{loadFromLocalStorage();}
-  }catch(e){console.error('Gist load:',e);loadFromLocalStorage();}
+/* ข้อมูลที่บันทึกลง Gist — ไม่รวม jvData และ itemMaster
+   เพราะ 2 อย่างนี้ดึงจาก Excel ทุกครั้ง และทำให้ไฟล์ใหญ่เกิน 1MB */
+function buildGistPayload(){
+  const ss={};
+  Object.entries(shiftData).forEach(([k,v])=>{ss[k]=k.endsWith('_raw')?v:[...v];});
+  return {logRows,descData,manualDescs,shiftData:ss,otData,reqRows,recvRows};
 }
+
+async function fetchGistContent(gistId, token){
+  /* ดึง content ผ่าน API endpoint ปกติ — ไม่ใช้ raw_url เพราะ CORS block จาก file:// */
+  const r=await fetch(`https://api.github.com/gists/${gistId}`,{
+    headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.github.v3+json'},
+    cache:'no-store'
+  });
+  if(!r.ok)throw new Error(`Gist fetch failed: ${r.status}`);
+  const g=await r.json();
+  const file=g.files?.['worklog_data.json'];
+  if(!file)throw new Error('ไม่พบ worklog_data.json ใน Gist');
+  if(file.truncated){
+    throw new Error('FILE_TOO_LARGE');
+  }
+  return {content:file.content, updatedAt:g.updated_at};
+}
+
+async function loadFromGist(){
+  if(!GIST_ID||!GIST_TOKEN){loadFromLocalStorage();return;}
+  try{
+    const {content,updatedAt}=await fetchGistContent(GIST_ID,GIST_TOKEN);
+    applyImportedData(JSON.parse(content));
+    renderAll();
+    const dt=updatedAt?new Date(updatedAt).toLocaleString('th-TH'):'–';
+    setDBStatus(true,`✅ Gist (${dt})`);
+  }catch(e){
+    if(e.message==='FILE_TOO_LARGE'){
+      setDBStatus(false,'⚠ Gist ใหญ่เกิน — กด รีเซ็ต Gist');
+      loadFromLocalStorage();
+      setTimeout(()=>{
+        if(confirm('⚠ ไฟล์ใน Gist ใหญ่เกินไป\nต้องการรีเซ็ตและบันทึกใหม่ไหม?\n(ข้อมูล jvData/itemMaster จะไม่ถูกเก็บใน Gist แต่ยังอยู่ใน LocalStorage)'))resetGist();
+      },500);
+    }else{
+      console.error('Gist load:',e);
+      setDBStatus(false,'⚠ Offline — LocalStorage');
+      loadFromLocalStorage();
+    }
+  }
+}
+
+async function resetGist(){
+  if(!GIST_ID||!GIST_TOKEN){alert('ยังไม่ได้ตั้งค่า Gist');return;}
+  const el=document.getElementById('autoSaveStatus');
+  if(el)el.textContent='⏳ กำลังรีเซ็ต Gist...';
+  try{
+    const payload=buildGistPayload();
+    const content=JSON.stringify(payload,null,2);
+    JSON.parse(content); // ตรวจสอบ JSON ก่อนส่ง
+    const r=await fetch(`https://api.github.com/gists/${GIST_ID}`,{
+      method:'PATCH',
+      headers:{Authorization:`Bearer ${GIST_TOKEN}`,Accept:'application/vnd.github.v3+json','Content-Type':'application/json'},
+      body:JSON.stringify({files:{'worklog_data.json':{content}}})
+    });
+    if(r.ok){
+      dbConnected=true;
+      const now=new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+      setDBStatus(true,`✅ Gist รีเซ็ต ${now}`);
+      if(el)el.textContent=`✅ Gist รีเซ็ต ${now}`;
+      alert('✅ รีเซ็ต Gist สำเร็จ!');
+    }else{
+      if(el)el.textContent=`❌ Error ${r.status}`;
+      alert(`รีเซ็ตไม่สำเร็จ: ${r.status}`);
+    }
+  }catch(e){
+    if(el)el.textContent='❌ Error';
+    alert('รีเซ็ตไม่สำเร็จ: '+e.message);
+  }
+}
+
+async function manualLoadGist(){
+  if(!GIST_ID||!GIST_TOKEN){alert('กรุณาตั้งค่า Gist ID และ Token ก่อน');return;}
+  const log=document.getElementById('gistDebugLog');
+  if(log)log.textContent='⏳ กำลังโหลดจาก Gist...';
+  try{
+    const {content,updatedAt}=await fetchGistContent(GIST_ID,GIST_TOKEN);
+    const obj=JSON.parse(content);
+    const dt=updatedAt?new Date(updatedAt).toLocaleString('th-TH'):'–';
+    const summary=[
+      `📋 ตารางงาน: ${obj.logRows?.length||0} แถว`,
+      `📦 เบิกของ: ${obj.reqRows?.length||0} แถว`,
+      `📥 รับของ: ${obj.recvRows?.length||0} แถว`,
+      `⏱ OT: ${obj.otData?.length||0} รายการ`,
+      `🕐 บันทึกล่าสุด: ${dt}`,
+    ].join('\n');
+    if(!confirm(`โหลดข้อมูลจาก Gist?\n\n${summary}\n\n⚠ ข้อมูลปัจจุบันในหน้าจะถูกแทนที่`))return;
+    applyImportedData(obj);
+    renderAll();
+    setDBStatus(true,`✅ Gist (${dt})`);
+    if(log)log.textContent=`✅ โหลดสำเร็จ!\n${summary}`;
+  }catch(e){
+    const msg=e.message==='FILE_TOO_LARGE'?'ไฟล์ใหญ่เกิน — กด "🔄 รีเซ็ต Gist" ก่อน':e.message;
+    if(log)log.textContent=`❌ Error: ${msg}`;
+    alert('โหลดไม่สำเร็จ: '+msg);
+  }
+}
+
 async function saveAllToDB(){
   saveToLocalStorage();
-  if(!dbConnected||!GIST_ID||!GIST_TOKEN){alert('บันทึกลง LocalStorage แล้ว\n(ตั้งค่า Gist ในหน้า "ตั้งค่า/Import" เพื่อซิงค์ออนไลน์)');return;}
+  if(!dbConnected||!GIST_ID||!GIST_TOKEN){
+    alert('บันทึกลง LocalStorage แล้ว\n(ตั้งค่า Gist ในหน้า "ตั้งค่า/Import" เพื่อซิงค์ออนไลน์)');return;
+  }
   try{
-    const ss={};Object.entries(shiftData).forEach(([k,v])=>{ss[k]=k.endsWith('_raw')?v:[...v];});
-    const content=JSON.stringify({logRows,jvData,descData,manualDescs,shiftData:ss,otData,reqRows,itemMaster,recvRows},null,2);
+    const content=JSON.stringify(buildGistPayload(),null,2);
     const r=await fetch(`https://api.github.com/gists/${GIST_ID}`,{
       method:'PATCH',
       headers:{Authorization:`Bearer ${GIST_TOKEN}`,Accept:'application/vnd.github.v3+json','Content-Type':'application/json'},
@@ -962,8 +1061,7 @@ async function doScheduledSave(triggerTime){
   autoSave(); // localStorage ก่อนเสมอ
   if(dbConnected&&GIST_ID&&GIST_TOKEN){
     try{
-      const ss={};Object.entries(shiftData).forEach(([k,v])=>{ss[k]=k.endsWith('_raw')?v:[...v];});
-      const content=JSON.stringify({logRows,jvData,descData,manualDescs,shiftData:ss,otData,reqRows,itemMaster,recvRows},null,2);
+    const content=JSON.stringify(buildGistPayload(),null,2);
       const r=await fetch(`https://api.github.com/gists/${GIST_ID}`,{
         method:'PATCH',
         headers:{Authorization:`Bearer ${GIST_TOKEN}`,Accept:'application/vnd.github.v3+json','Content-Type':'application/json'},
