@@ -857,12 +857,13 @@ function setDBStatus(ok,msg){
   el.textContent=msg||(ok?'✅ Gist':'⚠ LocalStorage');
   el.className=`db-pill ${ok?'ok':'err'}`;
 }
-/* ข้อมูลที่บันทึกลง Gist — ไม่รวม jvData และ itemMaster
-   เพราะ 2 อย่างนี้ดึงจาก Excel ทุกครั้ง และทำให้ไฟล์ใหญ่เกิน 1MB */
+/* ข้อมูลที่บันทึกลง Gist
+   ไม่รวม jvData เพราะมี 10,677 items ดึงจาก Excel ทุกครั้ง
+   รวม itemMaster เพราะต้องซิงค์ข้ามเครื่อง */
 function buildGistPayload(){
   const ss={};
   Object.entries(shiftData).forEach(([k,v])=>{ss[k]=k.endsWith('_raw')?v:[...v];});
-  return {logRows,descData,manualDescs,shiftData:ss,otData,reqRows,recvRows};
+  return {logRows,descData,manualDescs,shiftData:ss,otData,reqRows,itemMaster,recvRows};
 }
 
 async function fetchGistContent(gistId, token){
@@ -966,7 +967,7 @@ async function saveAllToDB(){
     alert('บันทึกลง LocalStorage แล้ว\n(ตั้งค่า Gist ในหน้า "ตั้งค่า/Import" เพื่อซิงค์ออนไลน์)');return;
   }
   try{
-    const content=JSON.stringify(buildGistPayload(),null,2);
+    const content=JSON.stringify(buildGistPayload());
     const r=await fetch(`https://api.github.com/gists/${GIST_ID}`,{
       method:'PATCH',
       headers:{Authorization:`Bearer ${GIST_TOKEN}`,Accept:'application/vnd.github.v3+json','Content-Type':'application/json'},
@@ -1061,7 +1062,7 @@ async function doScheduledSave(triggerTime){
   autoSave(); // localStorage ก่อนเสมอ
   if(dbConnected&&GIST_ID&&GIST_TOKEN){
     try{
-    const content=JSON.stringify(buildGistPayload(),null,2);
+    const content=JSON.stringify(buildGistPayload());
       const r=await fetch(`https://api.github.com/gists/${GIST_ID}`,{
         method:'PATCH',
         headers:{Authorization:`Bearer ${GIST_TOKEN}`,Accept:'application/vnd.github.v3+json','Content-Type':'application/json'},
