@@ -677,9 +677,9 @@ select option{background:var(--surface2)}
     <div class="import-grid">
       <!-- Gist DB Card -->
       <div class="import-card" style="border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.05)">
-        <h4 style="color:var(--accent)">☁ GitHub Gist Database</h4>
-        <p>ซิงค์ข้อมูลออนไลน์ผ่าน GitHub Gist<br>
-        <a href="https://gist.github.com" target="_blank" style="color:var(--blue);font-size:11px">สร้าง Gist ใหม่ →</a> |
+        <h4 style="color:var(--accent)">☁ GitHub Gist — Main DB</h4>
+        <p>เก็บ: logRows, reqRows, recvRows, otData, itemMaster, shiftData<br>
+        <a href="https://gist.github.com" target="_blank" style="color:var(--blue);font-size:11px">สร้าง Gist →</a> |
         <a href="https://github.com/settings/tokens" target="_blank" style="color:var(--blue);font-size:11px">สร้าง Token →</a></p>
         <div style="display:flex;flex-direction:column;gap:6px">
           <div>
@@ -698,6 +698,24 @@ select option{background:var(--surface2)}
         <div id="gistDebugLog" style="font-size:11px;color:var(--text3);margin-top:8px;font-family:'JetBrains Mono',monospace;white-space:pre-wrap;max-height:120px;overflow-y:auto"></div>
         <div style="font-size:10px;color:var(--text3);margin-top:4px">⚠ Token เก็บใน LocalStorage ของเครื่องคุณเท่านั้น</div>
       </div>
+
+      <!-- Gist JV Card -->
+      <div class="import-card" style="border-color:rgba(99,102,241,.3);background:rgba(99,102,241,.05)">
+        <h4 style="color:var(--blue)">☁ GitHub Gist — JV Database</h4>
+        <p>เก็บ: jvData (JV Cost) — ใช้ Token เดียวกัน สร้าง Gist แยกอีกอัน</p>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div>
+            <div style="font-size:11px;color:var(--text3);margin-bottom:3px">Gist ID (สำหรับ JV)</div>
+            <input type="text" id="gistJVId" placeholder="abc123def456..." style="width:100%;font-size:12px;font-family:'JetBrains Mono',monospace">
+          </div>
+          <button class="btn sm blue" onclick="saveGistJVConfig()" style="margin-top:4px">💾 บันทึก Gist JV</button>
+          <button class="btn sm" onclick="pushJVToGist()" style="margin-top:4px">⬆ บันทึก JV ขึ้น Gist</button>
+          <button class="btn sm" onclick="pullJVFromGist()" style="margin-top:4px">⬇ โหลด JV จาก Gist</button>
+        </div>
+        <div id="gistJVStatus" style="font-size:11px;color:var(--text3);margin-top:8px;font-family:'JetBrains Mono',monospace;min-height:14px"></div>
+        <div style="font-size:10px;color:var(--text3);margin-top:4px">💡 ใช้ Token เดียวกับ Main DB ด้านซ้าย</div>
+      </div>
+
       <div class="import-card">
         <h4>📂 JV Cost File</h4>
         <p>Columns: <strong>JV, Cost</strong></p>
@@ -767,7 +785,63 @@ const DEPT='Automation';
 let jvData=[],descData=[],manualDescs=[],logRows=[],shiftData={},otData=[],reqRows=[],itemMaster=[],recvRows=[];
 let filterPersons=new Set();
 let dbConnected=false;
-let GIST_ID='',GIST_TOKEN='';
+let GIST_ID='',GIST_TOKEN='',GIST_JV_ID='';
+
+/* ══ GITHUB GIST JV ══ */
+function saveGistJVConfig(){
+  GIST_JV_ID=document.getElementById('gistJVId')?.value.trim()||'';
+  localStorage.setItem('gist_jv_id',GIST_JV_ID);
+  alert('✅ บันทึก Gist JV ID แล้ว');
+}
+
+async function pushJVToGist(){
+  const st=document.getElementById('gistJVStatus');
+  if(!GIST_JV_ID||!GIST_TOKEN){
+    if(st)st.textContent='❌ ยังไม่ได้ตั้งค่า Gist JV ID หรือ Token';
+    alert('กรุณาตั้งค่า Gist JV ID และ Token ก่อน');return;
+  }
+  if(!jvData.length){alert('ยังไม่มีข้อมูล JV — อัปโหลด Excel ก่อน');return;}
+  if(st)st.textContent='⏳ กำลังบันทึก JV...';
+  try{
+    const content=JSON.stringify({jvData});
+    const r=await fetch(`https://api.github.com/gists/${GIST_JV_ID}`,{
+      method:'PATCH',
+      headers:{Authorization:`Bearer ${GIST_TOKEN}`,Accept:'application/vnd.github.v3+json','Content-Type':'application/json'},
+      body:JSON.stringify({files:{'jv_data.json':{content}}})
+    });
+    if(r.ok){
+      const now=new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+      if(st)st.textContent=`✅ บันทึก JV (${jvData.length} รายการ) ${now}`;
+    }else{
+      if(st)st.textContent=`❌ Error ${r.status}`;
+    }
+  }catch(e){
+    if(st)st.textContent='❌ '+e.message;
+  }
+}
+
+async function pullJVFromGist(){
+  const st=document.getElementById('gistJVStatus');
+  if(!GIST_JV_ID||!GIST_TOKEN){
+    if(st)st.textContent='❌ ยังไม่ได้ตั้งค่า Gist JV ID หรือ Token';
+    alert('กรุณาตั้งค่า Gist JV ID และ Token ก่อน');return;
+  }
+  if(st)st.textContent='⏳ กำลังโหลด JV...';
+  try{
+    const {content}=await fetchGistContent(GIST_JV_ID,GIST_TOKEN);
+    const obj=JSON.parse(content);
+    if(!obj.jvData?.length){if(st)st.textContent='⚠ ไม่พบข้อมูล JV ใน Gist';return;}
+    jvData=obj.jvData;
+    localStorage.setItem('worklog_jvData',JSON.stringify(jvData));
+    renderPool();updateInfo();
+    const now=new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+    if(st)st.textContent=`✅ โหลด JV (${jvData.length} รายการ) ${now}`;
+    setFileStatus('jvFileName',`Gist JV (${jvData.length} รายการ)`);
+  }catch(e){
+    if(st)st.textContent='❌ '+e.message;
+    alert('โหลด JV ไม่สำเร็จ: '+e.message);
+  }
+}
 
 /* ══ GITHUB GIST DB ══ */
 async function debugGist(){
@@ -824,8 +898,9 @@ async function debugGist(){
 function loadGistConfig(){
   GIST_ID=localStorage.getItem('gist_id')||'';
   GIST_TOKEN=localStorage.getItem('gist_token')||'';
-  const gi=document.getElementById('gistId');const gt=document.getElementById('gistToken');
-  if(gi)gi.value=GIST_ID;if(gt)gt.value=GIST_TOKEN;
+  GIST_JV_ID=localStorage.getItem('gist_jv_id')||'';
+  const gi=document.getElementById('gistId');const gt=document.getElementById('gistToken');const gjv=document.getElementById('gistJVId');
+  if(gi)gi.value=GIST_ID;if(gt)gt.value=GIST_TOKEN;if(gjv)gjv.value=GIST_JV_ID;
 }
 function saveGistConfig(){
   GIST_ID=document.getElementById('gistId')?.value.trim()||'';
@@ -890,6 +965,8 @@ async function loadFromGist(){
     renderAll();
     const dt=updatedAt?new Date(updatedAt).toLocaleString('th-TH'):'–';
     setDBStatus(true,`✅ Gist (${dt})`);
+    // โหลด JV จาก Gist JV อัตโนมัติถ้ายังไม่มีข้อมูล
+    if(!jvData.length&&GIST_JV_ID)pullJVFromGist();
   }catch(e){
     if(e.message==='FILE_TOO_LARGE'){
       setDBStatus(false,'⚠ Gist ใหญ่เกิน — กด รีเซ็ต Gist');
@@ -1231,6 +1308,12 @@ function loadJVFile(input){
     jvData=data.map(r=>({JV:String(r['JV']||r['jv']||'').trim(),Cost:parseFloat(r['Cost']||r['cost']||0)})).filter(r=>r.JV);
     setFileStatus('jvFileName',`${file.name} (${jvData.length} รายการ)`);
     renderPool();updateInfo();autoSave();
+    // ถ้ามี Gist JV ตั้งค่าไว้ — ถามว่าจะ push ขึ้นเลยไหม
+    if(GIST_JV_ID&&GIST_TOKEN){
+      if(confirm(`โหลด JV สำเร็จ ${jvData.length} รายการ\nต้องการบันทึกขึ้น Gist JV ด้วยไหม?`)){
+        pushJVToGist();
+      }
+    }
   };
   reader.readAsBinaryString(file);
 }
