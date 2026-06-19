@@ -767,7 +767,7 @@ select option{background:var(--surface2)}
           <button class="btn sm red" onclick="clearManualDesc()">🗑 ล้าง Manual</button>
         </div>
         <div style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm)">
-          <table class="pool-table"><thead><tr><th>#</th><th>Tag</th><th>Description (JV)</th><th>Type</th><th>Unit Cost</th><th>สุ่มได้</th><th>ที่มา</th><th></th></tr></thead>
+          <table class="pool-table"><thead><tr><th>#</th><th>Tag</th><th>Description (JV)</th><th>Type</th><th>Unit Cost</th><th>EA (Tag Count)</th><th>สุ่มได้</th><th>ที่มา</th><th></th></tr></thead>
           <tbody id="poolRows"></tbody></table>
         </div>
       </div>
@@ -793,9 +793,10 @@ const DEPT='Automation';
 
 /* ══ STATE ══ */
 let jvData=[],descData=[],manualDescs=[],logRows=[],shiftData={},otData=[],reqRows=[],itemMaster=[],recvRows=[];
-let pmtestData=[];           // รายการเครื่องจักร: {tag,desc,type,location}
-let pmtestLocFilter=new Set(); // Location ที่เลือก (ว่าง = ทั้งหมด)
+let pmtestData=[];
+let pmtestLocFilter=new Set();
 let filterPersons=new Set();
+let weeklyUsed={week:'',usedKeys:new Set()}; // track JV+tags ที่ใช้ในสัปดาห์นี้
 let dbConnected=false;
 let GIST_ID='',GIST_TOKEN='',GIST_JV_ID='';
 
@@ -843,7 +844,7 @@ async function pullJVFromGist(){
     const {content}=await fetchGistContent(GIST_JV_ID,GIST_TOKEN);
     const obj=JSON.parse(content);
     if(!obj.jvData?.length){if(st)st.textContent='⚠ ไม่พบข้อมูล JV ใน Gist';return;}
-    jvData=obj.jvData;
+    jvData=normalizeJVData(obj.jvData);
     localStorage.setItem('worklog_jvData',JSON.stringify(jvData));
     renderPool();updateInfo();
     const now=new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
@@ -1068,7 +1069,7 @@ async function saveAllToDB(){
 }
 function applyImportedData(obj){
   if(obj.logRows)logRows=obj.logRows;
-  if(obj.jvData)jvData=obj.jvData;
+  if(obj.jvData)jvData=normalizeJVData(obj.jvData);
   if(obj.descData)descData=obj.descData;
   if(obj.manualDescs)manualDescs=obj.manualDescs;
   if(obj.otData)otData=obj.otData;
@@ -1194,7 +1195,7 @@ function saveToLocalStorage(){
 function loadFromLocalStorage(){
   try{
     const r=localStorage.getItem('worklog_rows');if(r)logRows=JSON.parse(r);
-    const j=localStorage.getItem('worklog_jvData');if(j)jvData=JSON.parse(j);
+    const j=localStorage.getItem('worklog_jvData');if(j)jvData=normalizeJVData(JSON.parse(j));
     const d=localStorage.getItem('worklog_descData');if(d)descData=JSON.parse(d);
     const m=localStorage.getItem('worklog_manualDescs');if(m)manualDescs=JSON.parse(m);
     const o=localStorage.getItem('worklog_otData');if(o)otData=JSON.parse(o);
@@ -1202,6 +1203,7 @@ function loadFromLocalStorage(){
     const im=localStorage.getItem('worklog_itemMaster');if(im){itemMaster=JSON.parse(im);updateItemMasterUI();}
     const rv=localStorage.getItem('worklog_recvRows');if(rv)recvRows=JSON.parse(rv);
     const pm=localStorage.getItem('worklog_pmtestData');if(pm){pmtestData=JSON.parse(pm);renderPmtestLocationFilter();}
+    loadWeeklyUsed();
     const s=localStorage.getItem('worklog_shiftData');
     if(s){
       const p=JSON.parse(s);shiftData={};
@@ -1271,85 +1273,115 @@ function calcSmartEA(cost, personName, dateStr){
   return ea;
 }
 
-/* ══ POOL — pmtest × jv cross join ══
+/* ══ NORMALIZE jvData ══
+   รองรับทั้งรูปแบบเก่า {JV,Cost} และใหม่ {tag,desc,type,cost,enabled}
+*/
+function normalizeJVData(arr){
+  return arr.map(r=>{
+    return {
+      tag: String(r.tag||r.JV||r['Job Value']||r.jv||'').trim(),
+      desc: String(r.desc||r.Description||r.Discription||r.description||'').trim(),
+      type: String(r.type||r.Type||'').trim().toLowerCase(),
+      cost: parseFloat(r.cost||r.Cost||r['Unit Cost']||0),
+      // ถ้า enabled เป็น boolean ใช้เลย ถ้าไม่ใช่ให้แปลงจาก 0/1
+      enabled:(()=>{
+        if(typeof r.enabled==='boolean') return r.enabled;
+        const v=r['0/1']??r.Enable;
+        return v===undefined?true:String(v).trim()==='1';
+      })()
+    };
+  }).filter(r=>r.tag||r.desc);
+}
+/* ══ POOL — 1 item ต่อ JV ที่ enabled, จำนวน Tag ตาม cost limit 10,000 ══
    Logic:
-   1. สุ่มจาก pmtestData (กรองตาม Location ที่เลือก)
-   2. match type ของ machine → หา jv ที่ enabled=1 และ type ตรง
-   3. แสดง Description เป็น "JV Description (Tag)"
-   4. Unit Cost < 5000 → เลือก jv อื่นที่ cost > 7500 ในกลุ่ม location เดียวกัน
+   1. วน JV ทุกตัวที่ enabled=1 และมี type ตรงกับ pmtest
+   2. แต่ละ JV → คำนวณ maxTags = floor(10000/cost)
+   3. สุ่ม Tag จาก pmtest (shuffle) แล้วเอาแค่ maxTags ตัว
+   4. pool มีหลาย item (1 ต่อ JV) เพื่อแจกให้ 4+ คนโดยไม่ซ้ำกัน
 */
 function getMergedPool(){
-  // รวม jvData + manualDescs เป็น pool ของ JV
   const allJV=[
     ...jvData.map(d=>({tag:d.tag,desc:d.desc,type:d.type,cost:d.cost,enabled:d.enabled,src:'excel'})),
     ...manualDescs.map(d=>({tag:d.JV,desc:d.Discription,type:d.type||'',cost:d.Cost,enabled:d.enabled!==false,src:'manual',id:d.id}))
   ];
-  // ถ้ายังไม่มี pmtestData ให้ fallback เป็น jvData ปกติ
+  const enabledJV=allJV.filter(j=>j.enabled===true&&j.type);
+
   if(!pmtestData.length){
-    return allJV.filter(j=>j.enabled).map(j=>({JV:j.tag,Discription:j.desc,Cost:j.cost,type:j.type,src:j.src,id:j.id}));
+    return enabledJV.map(j=>({JV:j.tag,Discription:j.desc,Cost:j.cost,type:j.type,tagCount:1,tags:[],src:j.src,id:j.id}));
   }
-  // กรอง machines ตาม Location filter
+
   const machines=pmtestLocFilter.size>0
     ?pmtestData.filter(m=>pmtestLocFilter.has(m.location))
     :pmtestData;
-  // สร้าง pool: แต่ละ machine จับคู่กับ jv ที่ enabled=1 และ type ตรง
-  const pool=[];
+
+  const machinesByType={};
   machines.forEach(m=>{
-    const matchJV=allJV.filter(j=>j.enabled&&j.type&&m.type&&j.type.toLowerCase()===m.type.toLowerCase());
-    if(!matchJV.length)return;
-    // เลือก JV ที่ดีที่สุด: ถ้า cost < 5000 ให้เปลี่ยนไปใช้ที่ cost > 7500 (กรอง location เดียวกันก่อน)
-    let chosen=matchJV[Math.floor(Math.random()*matchJV.length)];
-    if(chosen.cost<5000){
-      const highCost=matchJV.filter(j=>j.cost>7500);
-      if(highCost.length)chosen=highCost[Math.floor(Math.random()*highCost.length)];
-    }
-    // Description = "JV Desc (Tag)"
+    const t=m.type.toLowerCase();
+    if(!machinesByType[t])machinesByType[t]=[];
+    machinesByType[t].push(m);
+  });
+
+  const pool=[];
+  enabledJV.forEach(j=>{
+    const t=j.type.toLowerCase();
+    const matchMachines=machinesByType[t]||[];
+    if(!matchMachines.length)return;
+    const cost=j.cost||0;
+    const maxTags=cost>0?Math.floor(10000/cost):matchMachines.length;
+    const ea=Math.max(1,Math.min(matchMachines.length,maxTags));
+    // shuffle machines แล้วเลือก ea ตัว
+    const shuffled=[...matchMachines].sort(()=>Math.random()-.5);
+    const usedTags=shuffled.slice(0,ea).map(m=>m.tag);
     pool.push({
-      JV:chosen.tag,
-      Discription:`${chosen.desc} (${m.tag})`,
-      Cost:chosen.cost,
-      type:m.type,
-      machineTag:m.tag,
-      machineDesc:m.desc,
-      location:m.location,
-      src:chosen.src,
-      id:chosen.id
+      JV:j.tag,
+      Discription:`${j.desc} (${usedTags.join(', ')})`,
+      Cost:cost,
+      type:t,
+      tagCount:ea,
+      tags:usedTags,
+      src:j.src,
+      id:j.id
     });
   });
   return pool;
 }
+
 function getMergedPoolStable(){
-  // เหมือน getMergedPool แต่ไม่สุ่ม — ใช้แสดงใน Pool Table
   const allJV=[
     ...jvData.map(d=>({tag:d.tag,desc:d.desc,type:d.type,cost:d.cost,enabled:d.enabled,src:'excel'})),
     ...manualDescs.map(d=>({tag:d.JV,desc:d.Discription,type:d.type||'',cost:d.Cost,enabled:d.enabled!==false,src:'manual',id:d.id}))
   ];
   if(!pmtestData.length){
-    return allJV.map(j=>({JV:j.tag,Discription:j.desc,Cost:j.cost,type:j.type,enabled:j.enabled,src:j.src,id:j.id}));
+    return allJV.map(j=>({JV:j.tag,Discription:j.desc,Cost:j.cost,type:j.type,enabled:j.enabled,costFlag:'ok',tagCount:1,src:j.src,id:j.id}));
   }
   const machines=pmtestLocFilter.size>0
     ?pmtestData.filter(m=>pmtestLocFilter.has(m.location))
     :pmtestData;
-  const pool=[];
+  const machinesByType={};
   machines.forEach(m=>{
-    const matchJV=allJV.filter(j=>j.type&&m.type&&j.type.toLowerCase()===m.type.toLowerCase());
-    if(!matchJV.length)return;
-    matchJV.forEach(j=>{
-      const costOk=j.cost>=5000;
-      pool.push({
-        JV:j.tag,
-        Discription:`${j.desc} (${m.tag})`,
-        Cost:j.cost,
-        type:m.type,
-        enabled:j.enabled,
-        costFlag:j.cost<5000?'low':'ok',
-        location:m.location,
-        src:j.src,
-        id:j.id
-      });
-    });
+    const t=m.type.toLowerCase();
+    if(!machinesByType[t])machinesByType[t]=[];
+    machinesByType[t].push(m);
   });
-  return pool;
+  return allJV.map(j=>{
+    const t=(j.type||'').toLowerCase();
+    const matchMachines=machinesByType[t]||[];
+    const cost=j.cost||0;
+    const maxTags=cost>0?Math.floor(10000/cost):matchMachines.length;
+    const ea=Math.max(1,Math.min(matchMachines.length||1,maxTags));
+    const usedTags=matchMachines.slice(0,ea).map(m=>m.tag);
+    return{
+      JV:j.tag,
+      Discription:usedTags.length?`${j.desc} (${usedTags.join(', ')})`:j.desc,
+      Cost:cost,
+      type:t,
+      enabled:j.enabled,
+      costFlag:cost>0&&ea*cost>10000?'high':'ok',
+      tagCount:ea,
+      src:j.src,
+      id:j.id
+    };
+  });
 }
 function getCostByJV(tag){
   const m=manualDescs.find(d=>d.JV===tag);if(m)return m.Cost;
@@ -1371,6 +1403,11 @@ function renderPool(){
     <td style="font-size:12px;max-width:260px;white-space:normal">${esc(item.Discription)}</td>
     <td><span class="badge dept" style="font-size:10px">${esc(item.type)||'–'}</span></td>
     <td style="font-family:'JetBrains Mono',monospace;font-size:12px;color:${item.costFlag==='low'?'var(--red)':'var(--green)'}">${item.Cost>0?item.Cost.toLocaleString():'–'}${item.costFlag==='low'?'<span style="font-size:9px;margin-left:4px;color:var(--red)">⚠ &lt;5k</span>':''}</td>
+    <td style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--purple)">${
+      item.costFlag==='low'&&item.tagCount!==item.baseTagCount
+        ?`<span title="Tag จริง ${item.baseTagCount} + เพิ่มจาก cost<5000">${item.tagCount} <span style="font-size:9px;color:var(--accent)">↑${item.baseTagCount}</span></span>`
+        :(item.tagCount||'–')
+    }</td>
     <td>${item.enabled?'<span class="badge green" style="font-size:10px">✅ 1</span>':'<span class="badge red" style="font-size:10px">🚫 0</span>'}</td>
     <td><span class="badge ${item.src==='manual'?'purple':'day'}">${item.src==='manual'?'Manual':'Excel'}</span></td>
     <td>${item.src==='manual'?`<button class="btn sm red" onclick="removeManual(${item.id})">🗑</button>`:''}</td>
@@ -1400,11 +1437,11 @@ function loadJVFile(input){
     const data=XLSX.utils.sheet_to_json(ws,{defval:''});
     // Format: Tag, Description, Type, Unit Cost, 0/1
     jvData=data.map(r=>({
-      tag:String(r['Tag']||r['tag']||r['JV']||r['jv']||'').trim(),
+      tag:String(r['Tag']||r['tag']||r['Job Value']||r['JV']||r['jv']||'').trim(),
       desc:String(r['Description']||r['Discription']||r['description']||'').trim(),
       type:String(r['Type']||r['type']||'').trim().toLowerCase(),
       cost:parseFloat(r['Unit Cost']||r['Cost']||r['cost']||0),
-      enabled:(String(r['0/1']||r['Enable']||'1').trim()==='1')
+      enabled:(()=>{const v=r['0/1']??r['Enable'];return v===undefined?true:String(v).trim()==='1';})()
     })).filter(r=>r.tag||r.desc);
     const enabledCount=jvData.filter(r=>r.enabled).length;
     setFileStatus('jvFileName',`${file.name} (${jvData.length} รายการ, สุ่มได้: ${enabledCount})`);
@@ -1543,14 +1580,42 @@ function updateInfo(){
   document.getElementById('infoBar').innerHTML=msg;
 }
 
+/* ══ WEEKLY USED TRACKER ══ */
+function getWeekKey(dateStr){
+  const d=new Date(dateStr);
+  // ISO week: วันจันทร์เป็นต้นสัปดาห์
+  const day=d.getDay()||7;
+  const mon=new Date(d);
+  mon.setDate(d.getDate()-day+1);
+  return mon.toISOString().slice(0,10);
+}
+function checkResetWeekly(dateStr){
+  const wk=getWeekKey(dateStr);
+  if(weeklyUsed.week!==wk){
+    weeklyUsed={week:wk,usedKeys:new Set()};
+    saveWeeklyUsed();
+  }
+}
+function saveWeeklyUsed(){
+  localStorage.setItem('worklog_weeklyUsed',JSON.stringify({week:weeklyUsed.week,usedKeys:[...weeklyUsed.usedKeys]}));
+}
+function loadWeeklyUsed(){
+  try{
+    const s=localStorage.getItem('worklog_weeklyUsed');
+    if(s){const o=JSON.parse(s);weeklyUsed={week:o.week||'',usedKeys:new Set(o.usedKeys||[])};}
+  }catch(e){}
+}
+
 /* ══ ADD DAY ══ */
 function addDay(){
-  const pool=getMergedPool();
-  if(!pool.length){alert('ยังไม่มี Description ใน Pool');return;}
+  // ทดสอบ pool ครั้งแรกว่ามีข้อมูลไหม
+  const testPool=getMergedPool();
+  if(!testPool.length){alert('ยังไม่มี Description ใน Pool\nกรุณาโหลดไฟล์ JV และ pmtest ก่อน');return;}
   const dateVal=document.getElementById('pickDate').value;
   if(!dateVal){alert('กรุณาเลือกวันที่');return;}
-  const validPool=pool.filter(item=>(item.Cost||0)<=10000&&(item.Cost||0)>0);
-  if(!validPool.length){alert('ไม่มี JV ที่มี Cost ≤ 10,000');return;}
+
+  // เช็ค reset สัปดาห์อัตโนมัติ
+  checkResetWeekly(dateVal);
   const dpp=parseInt(document.querySelector('input[name="dpp"]:checked').value);
   const dateObj=new Date(dateVal);
   const dayNames=['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัส','ศุกร์','เสาร์'];
@@ -1561,9 +1626,6 @@ function addDay(){
   if(off.length>0){
     if(!confirm(`⚠ ${off.map(p=>p.name).join(', ')} หยุด\nสุ่มให้ ${allActive.length} คน ใช่ไหม?`))return;
   }
-  const shuffled=[...validPool].sort(()=>Math.random()-.5);
-  const picked=[];
-  for(let i=0;i<allActive.length*dpp;i++)picked.push(shuffled[i%shuffled.length]);
 
   // เรียงลำดับตามกะ d > a > n > ไม่มีกะ
   const shiftOrder={d:0,a:1,n:2};
@@ -1573,20 +1635,45 @@ function addDay(){
   };
   const active=[...allActive].sort((a,b)=>getShift(a.name)-getShift(b.name));
 
+  // กรอง pool เอาเฉพาะที่ยังไม่ได้ใช้ในสัปดาห์นี้
+  let availPool=getMergedPool().filter(item=>{
+    const key=`${item.JV}||${(item.tags||[]).join(',')}`;
+    return !weeklyUsed.usedKeys.has(key);
+  });
+
+  if(!availPool.length){
+    if(confirm('⚠ JV ทั้งหมดถูกใช้ในสัปดาห์นี้ครบแล้ว\nต้องการ Reset สัปดาห์และสุ่มใหม่ไหม?')){
+      weeklyUsed={week:getWeekKey(dateVal),usedKeys:new Set()};
+      saveWeeklyUsed();
+      availPool=getMergedPool();
+    }else return;
+  }
+
+  // shuffle แล้วแจกตามลำดับ — ไม่ซ้ำกันในวันเดียวกัน
+  const shuffled=[...availPool].sort(()=>Math.random()-.5);
+  let pi=0;
+
   active.forEach((person,pIdx)=>{
     for(let d=0;d<dpp;d++){
-      const item=picked[pIdx*dpp+d];
+      const item=shuffled[pi%shuffled.length];
+      pi++;
+      if(!item)return;
       const cost=item.Cost||0;
-      const autoEA=calcSmartEA(cost,person.name,dateVal);
+      const autoEA=item.tagCount>0?item.tagCount:1;
+      const key=`${item.JV}||${(item.tags||[]).join(',')}`;
+      weeklyUsed.usedKeys.add(key);
       logRows.push({
-        id:Date.now()+pIdx*100+d,date:dateVal,dayName,dept:DEPT,
+        id:Date.now()+pIdx*1000+d,date:dateVal,dayName,dept:DEPT,
         jv:item.JV||'',description:item.Discription,persons:[person.name],
         workOrder:'',ea:autoEA,cost,total:autoEA*cost,eaAuto:true
       });
     }
   });
+
+  saveWeeklyUsed();
   renderTable();updateManpowerMonths();autoSave();
   if(off.length)document.getElementById('infoBar').innerHTML=`✅ สุ่มงาน ${dateVal} สำเร็จ | <span class="badge red">🚫 หยุด: ${off.map(p=>p.name).join(', ')}</span>`;
+  else updateInfo();
 }
 
 function addManualRow(){
