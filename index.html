@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Work Log — Automation</title>
+<title>Work Logs — Automation</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -120,6 +120,15 @@ thead th{
 }
 thead th.th-job{color:var(--accent);border-bottom:2px solid rgba(245,158,11,.4)}
 thead th.th-cost{color:var(--blue);border-bottom:2px solid rgba(99,102,241,.4)}
+th.sortable{cursor:pointer;user-select:none;position:relative;padding-right:16px!important}
+th.sortable:hover{background:rgba(255,255,255,.04)}
+th.sortable::after{content:'⇅';position:absolute;right:4px;opacity:.35;font-size:10px}
+th.sortable.sort-asc::after{content:'↑';opacity:1;color:var(--accent)}
+th.sortable.sort-desc::after{content:'↓';opacity:1;color:var(--accent)}
+.pagination-btn{padding:5px 10px;font-size:12px;border-radius:6px;border:1px solid rgba(255,255,255,.1);background:var(--bg2);color:var(--text2);cursor:pointer}
+.pagination-btn:hover:not(:disabled){background:rgba(255,255,255,.08)}
+.pagination-btn.active{background:var(--accent);color:#000;font-weight:700;border-color:var(--accent)}
+.pagination-btn:disabled{opacity:.35;cursor:not-allowed}
 .section-row th{background:var(--surface);padding:6px 10px;font-size:10px;font-weight:700;letter-spacing:.8px}
 .section-row th.s-job{color:var(--accent);background:rgba(245,158,11,.05);border-left:3px solid var(--accent)}
 .section-row th.s-cost{color:var(--blue);background:rgba(99,102,241,.05);border-left:3px solid var(--blue)}
@@ -390,6 +399,10 @@ select option{background:var(--surface2)}
         <label style="font-size:13px;color:var(--text2);font-weight:600">บุคคล:</label>
         <div style="display:flex;gap:5px;flex-wrap:wrap" id="filterPersonBtns"></div>
       </div>
+      <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:180px">
+        <label style="font-size:13px;color:var(--text2);font-weight:600">🔎</label>
+        <input type="text" id="logSearchInput" placeholder="ค้นหา Description, JV, Person, Date..." oninput="handleLogSearch()" style="padding:6px 10px;font-size:13px;flex:1;min-width:140px">
+      </div>
       <button class="btn ghost sm" onclick="clearFilters()" style="margin-left:auto">✖ ล้างตัวกรอง</button>
       <span id="filterCount" style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace"></span>
     </div>
@@ -404,11 +417,11 @@ select option{background:var(--surface2)}
             <th colspan="6" class="s-cost">💰 Cost Info</th>
           </tr>
           <tr>
-            <th class="th-job">#</th><th class="th-job">Day</th><th class="th-job">Date</th>
-            <th class="th-job">Work Order</th><th class="th-job">JV</th>
-            <th class="th-job">Dept</th><th class="th-job">Description</th>
-            <th class="th-cost">Person(s)</th><th class="th-cost">EA</th>
-            <th class="th-cost">Cost</th><th class="th-cost">Total</th>
+            <th class="th-job sortable" data-column="idx" onclick="handleLogSort('idx')">#</th><th class="th-job sortable" data-column="dayName" onclick="handleLogSort('dayName')">Day</th><th class="th-job sortable" data-column="date" onclick="handleLogSort('date')">Date</th>
+            <th class="th-job sortable" data-column="workOrder" onclick="handleLogSort('workOrder')">Work Order</th><th class="th-job sortable" data-column="jv" onclick="handleLogSort('jv')">JV</th>
+            <th class="th-job">Dept</th><th class="th-job sortable" data-column="description" onclick="handleLogSort('description')">Description</th>
+            <th class="th-cost">Person(s)</th><th class="th-cost sortable" data-column="ea" onclick="handleLogSort('ea')">EA</th>
+            <th class="th-cost sortable" data-column="cost" onclick="handleLogSort('cost')">Cost</th><th class="th-cost sortable" data-column="total" onclick="handleLogSort('total')">Total</th>
             <th class="th-cost">Split</th><th class="th-cost"></th>
           </tr>
         </thead>
@@ -416,6 +429,19 @@ select option{background:var(--surface2)}
           <tr><td colspan="13" class="empty-state"><div class="ico">📊</div>ยังไม่มีข้อมูล</td></tr>
         </tbody>
       </table>
+    </div>
+    <div class="pagination-bar" id="logPaginationBar" style="display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap">
+      <span id="logPaginationInfo" style="font-size:12px;color:var(--text3)"></span>
+      <div style="display:flex;align-items:center;gap:6px;margin-left:auto">
+        <label style="font-size:12px;color:var(--text2)">แสดง:</label>
+        <select id="logPageSize" onchange="handleLogPageSizeChange()" style="padding:4px 8px;font-size:12px">
+          <option value="25">25</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+          <option value="-1">ทั้งหมด</option>
+        </select>
+      </div>
+      <div id="logPaginationNav" style="display:flex;gap:4px"></div>
     </div>
   </div>
 </div>
@@ -796,6 +822,9 @@ let jvData=[],descData=[],manualDescs=[],logRows=[],shiftData={},otData=[],reqRo
 let pmtestData=[];
 let pmtestLocFilter=new Set();
 let filterPersons=new Set();
+let logSearchQuery='';
+let logSort={column:'',direction:'asc'};
+let logPagination={currentPage:1};
 let weeklyUsed={week:'',usedKeys:new Set()}; // track JV+tags ที่ใช้ในสัปดาห์นี้
 let dbConnected=false;
 let GIST_ID='',GIST_TOKEN='',GIST_JV_ID='';
@@ -1754,12 +1783,30 @@ function clearFilters(){
   document.getElementById('filterDateFrom').value='';document.getElementById('filterDateTo').value='';
   filterPersons.clear();
   document.querySelectorAll('#filterPersonBtns .person-toggle').forEach(b=>b.classList.remove('selected'));
+  logSearchQuery='';
+  const si=document.getElementById('logSearchInput');if(si)si.value='';
+  logPagination.currentPage=1;
+  renderTable();
+}
+function handleLogSearch(){
+  logSearchQuery=(document.getElementById('logSearchInput')?.value||'').toLowerCase().trim();
+  logPagination.currentPage=1;
+  renderTable();
+}
+function handleLogSort(column){
+  if(logSort.column===column)logSort.direction=logSort.direction==='asc'?'desc':'asc';
+  else{logSort.column=column;logSort.direction='asc';}
+  logPagination.currentPage=1;
+  renderTable();
+}
+function handleLogPageSizeChange(){
+  logPagination.currentPage=1;
   renderTable();
 }
 function getFilteredRows(){
   const from=document.getElementById('filterDateFrom')?.value||'';
   const to=document.getElementById('filterDateTo')?.value||'';
-  return logRows.map((row,idx)=>({row,idx})).filter(({row})=>{
+  let rows=logRows.map((row,idx)=>({row,idx})).filter(({row})=>{
     if(from&&row.date<from)return false;
     if(to&&row.date>to)return false;
     if(filterPersons.size>0){
@@ -1768,23 +1815,69 @@ function getFilteredRows(){
     }
     return true;
   });
+  if(logSearchQuery){
+    const q=logSearchQuery;
+    rows=rows.filter(({row})=>{
+      const ps=Array.isArray(row.persons)?row.persons:[row.persons||''];
+      return (row.description||'').toLowerCase().includes(q)
+        ||(row.jv||'').toLowerCase().includes(q)
+        ||(row.workOrder||'').toLowerCase().includes(q)
+        ||(row.date||'').includes(q)
+        ||ps.some(p=>(p||'').toLowerCase().includes(q));
+    });
+  }
+  if(logSort.column){
+    const col=logSort.column;
+    const mult=logSort.direction==='asc'?1:-1;
+    rows=[...rows].sort((a,b)=>{
+      let va,vb;
+      if(col==='idx'){va=a.idx;vb=b.idx;}
+      else if(col==='ea'){va=parseFloat(a.row.ea)||0;vb=parseFloat(b.row.ea)||0;}
+      else if(col==='total'){va=(parseFloat(a.row.ea)||0)*(a.row.cost||0);vb=(parseFloat(b.row.ea)||0)*(b.row.cost||0);}
+      else if(col==='cost'){va=a.row.cost||0;vb=b.row.cost||0;}
+      else{va=a.row[col]||'';vb=b.row[col]||'';}
+      if(typeof va==='number'&&typeof vb==='number')return(va-vb)*mult;
+      return String(va).localeCompare(String(vb))*mult;
+    });
+  }
+  return rows;
 }
 
 /* ══ RENDER TABLE ══ */
 function renderTable(){
   const tbody=document.getElementById('logBody');
   if(!tbody)return;
+  applySortHeaderClasses();
+  const pageBar=document.getElementById('logPaginationBar');
   if(!logRows.length){
     tbody.innerHTML=`<tr><td colspan="13" class="empty-state"><div class="ico">📊</div>ยังไม่มีข้อมูล</td></tr>`;
-    const fc=document.getElementById('filterCount');if(fc)fc.textContent='';return;
+    const fc=document.getElementById('filterCount');if(fc)fc.textContent='';
+    if(pageBar)pageBar.style.display='none';
+    return;
   }
   const filtered=getFilteredRows();
   const fc=document.getElementById('filterCount');
   if(fc)fc.textContent=`${filtered.length} / ${logRows.length} แถว`;
   if(!filtered.length){
-    tbody.innerHTML=`<tr><td colspan="13" class="empty-state"><div class="ico">🔍</div>ไม่พบข้อมูลที่ตรงกับตัวกรอง</td></tr>`;return;
+    tbody.innerHTML=`<tr><td colspan="13" class="empty-state"><div class="ico">🔍</div>ไม่พบข้อมูลที่ตรงกับตัวกรอง</td></tr>`;
+    if(pageBar)pageBar.style.display='none';
+    return;
   }
-  tbody.innerHTML=filtered.map(({row,idx})=>{
+  if(pageBar)pageBar.style.display='flex';
+  const pageSizeSel=document.getElementById('logPageSize');
+  const pageSize=parseInt(pageSizeSel?.value||'50',10);
+  const totalPages=pageSize===-1?1:Math.max(1,Math.ceil(filtered.length/pageSize));
+  if(logPagination.currentPage>totalPages)logPagination.currentPage=totalPages;
+  if(logPagination.currentPage<1)logPagination.currentPage=1;
+  const startIdx=pageSize===-1?0:(logPagination.currentPage-1)*pageSize;
+  const endIdx=pageSize===-1?filtered.length:Math.min(startIdx+pageSize,filtered.length);
+  const pageData=pageSize===-1?filtered:filtered.slice(startIdx,endIdx);
+
+  const info=document.getElementById('logPaginationInfo');
+  if(info)info.textContent=`แสดง ${filtered.length===0?0:startIdx+1}–${endIdx} จาก ${filtered.length} แถว`;
+  renderLogPaginationNav(totalPages,pageSize);
+
+  tbody.innerHTML=pageData.map(({row,idx})=>{
     const ea=parseFloat(row.ea)||0,cost=row.cost||0,jvTotal=ea*cost;
     row.total=jvTotal;
     const totalFlag=jvTotal<=0?'':(jvTotal>10000?'high':'ok');
@@ -1816,6 +1909,25 @@ function renderTable(){
     </tr>`;
   }).join('');
 }
+function applySortHeaderClasses(){
+  document.querySelectorAll('#logTable th.sortable').forEach(th=>{
+    th.classList.remove('sort-asc','sort-desc');
+    if(th.getAttribute('data-column')===logSort.column)th.classList.add(logSort.direction==='asc'?'sort-asc':'sort-desc');
+  });
+}
+function renderLogPaginationNav(totalPages,pageSize){
+  const nav=document.getElementById('logPaginationNav');
+  if(!nav)return;
+  if(pageSize===-1){nav.innerHTML='';return;}
+  const cur=logPagination.currentPage;
+  let html=`<button class="pagination-btn" ${cur===1?'disabled':''} onclick="changeLogPage(${cur-1})">‹ ก่อนหน้า</button>`;
+  const maxV=5;let sp=Math.max(1,cur-2);let ep=Math.min(totalPages,sp+maxV-1);
+  if(ep-sp+1<maxV)sp=Math.max(1,ep-maxV+1);
+  for(let p=sp;p<=ep;p++)html+=`<button class="pagination-btn ${p===cur?'active':''}" onclick="changeLogPage(${p})">${p}</button>`;
+  html+=`<button class="pagination-btn" ${cur===totalPages?'disabled':''} onclick="changeLogPage(${cur+1})">ถัดไป ›</button>`;
+  nav.innerHTML=html;
+}
+function changeLogPage(p){logPagination.currentPage=p;renderTable();}
 function buildPersonSelect(idx,selected){
   return`<div style="display:flex;flex-wrap:wrap;gap:3px">${PERSONS.map(p=>`<span class="person-toggle ${selected.includes(p.name)?'selected':''}" onclick="togglePerson(${idx},'${p.name}')">${p.name}<span class="badge lv${p.level}" style="margin-left:3px">L${p.level}</span></span>`).join('')}</div>`;
 }
