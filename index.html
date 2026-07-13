@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Work Log — Automation</title>
+<title>Work Logs — Automation</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -1315,6 +1315,17 @@ function computeEAForCostRange(cost, availableCount){
   return{ea,baseTagCount:ea,total,flag};
 }
 
+/* ══ ZONE HELPER — ใช้ 2 คำแรกของ Location เป็นตัวกำหนดโซน ══
+   "Stock prep NBKP&LBKP pulper" และ "Stock prep NBKP&LBKP washer" → โซนเดียวกัน "Stock prep"
+   ทำให้อนุโลมผสม Location ต่างกันได้ ถ้าอยู่ในโซน/พื้นที่เดียวกัน
+*/
+function getZone(location){
+  const s=String(location||'').trim();
+  if(!s)return'';
+  const words=s.split(/\s+/);
+  return words.slice(0,2).join(' ');
+}
+
 /* ══ POOL — 1 item ต่อ JV ที่ enabled, จำนวน Tag ตาม cost limit 10,000 ══
    Logic:
    1. วน JV ทุกตัวที่ enabled=1 และมี type ตรงกับ pmtest
@@ -1350,26 +1361,26 @@ function getMergedPool(){
     const matchMachines=machinesByType[t]||[];
     if(!matchMachines.length)return;
     const cost=j.cost||0;
-    // จัดกลุ่มเครื่องจักรตาม Location — ห้ามผสม Location ต่างกันใน 1 Work Order เดียว
-    const byLoc={};
+    // จัดกลุ่มเครื่องจักรตามโซน (2 คำแรกของ Location) — อนุโลมผสม Location ต่างกันได้ถ้าอยู่โซนเดียวกัน
+    const byZone={};
     matchMachines.forEach(m=>{
-      const loc=m.location||'';
-      if(!byLoc[loc])byLoc[loc]=[];
-      byLoc[loc].push(m);
+      const zone=getZone(m.location);
+      if(!byZone[zone])byZone[zone]=[];
+      byZone[zone].push(m);
     });
-    Object.keys(byLoc).forEach(loc=>{
-      const locMachines=byLoc[loc];
-      const{ea,flag}=computeEAForCostRange(cost,locMachines.length);
+    Object.keys(byZone).forEach(zone=>{
+      const zoneMachines=byZone[zone];
+      const{ea,flag}=computeEAForCostRange(cost,zoneMachines.length);
       if(ea<=0)return;
-      // shuffle เครื่องจักรในกลุ่ม Location นี้ แล้วเลือก ea ตัว
-      const shuffled=[...locMachines].sort(()=>Math.random()-.5);
+      // shuffle เครื่องจักรในโซนนี้ แล้วเลือก ea ตัว
+      const shuffled=[...zoneMachines].sort(()=>Math.random()-.5);
       const usedTags=shuffled.slice(0,ea).map(m=>m.tag);
       pool.push({
         JV:j.tag,
-        Discription:loc?`${j.desc} (${usedTags.join(', ')}) - ${loc}`:`${j.desc} (${usedTags.join(', ')})`,
+        Discription:zone?`${j.desc} (${usedTags.join(', ')}) - ${zone}`:`${j.desc} (${usedTags.join(', ')})`,
         Cost:cost,
         type:t,
-        location:loc,
+        location:zone,
         tagCount:ea,
         totalCost:ea*cost,
         costFlag:flag,
@@ -1406,23 +1417,23 @@ function getMergedPoolStable(){
     if(!matchMachines.length){
       return[{JV:j.tag,Discription:j.desc,Cost:cost,type:t,enabled:j.enabled,costFlag:'ok',tagCount:0,src:j.src,id:j.id}];
     }
-    // จัดกลุ่มเครื่องจักรตาม Location — ห้ามผสม Location ต่างกันใน 1 Work Order เดียว
-    const byLoc={};
+    // จัดกลุ่มเครื่องจักรตามโซน (2 คำแรกของ Location) — อนุโลมผสม Location ต่างกันได้ถ้าอยู่โซนเดียวกัน
+    const byZone={};
     matchMachines.forEach(m=>{
-      const loc=m.location||'';
-      if(!byLoc[loc])byLoc[loc]=[];
-      byLoc[loc].push(m);
+      const zone=getZone(m.location);
+      if(!byZone[zone])byZone[zone]=[];
+      byZone[zone].push(m);
     });
-    return Object.keys(byLoc).map(loc=>{
-      const locMachines=byLoc[loc];
-      const{ea,baseTagCount,total,flag}=computeEAForCostRange(cost,locMachines.length);
-      const usedTags=locMachines.slice(0,ea).map(m=>m.tag);
+    return Object.keys(byZone).map(zone=>{
+      const zoneMachines=byZone[zone];
+      const{ea,baseTagCount,total,flag}=computeEAForCostRange(cost,zoneMachines.length);
+      const usedTags=zoneMachines.slice(0,ea).map(m=>m.tag);
       return{
         JV:j.tag,
-        Discription:usedTags.length?(loc?`${j.desc} (${usedTags.join(', ')}) - ${loc}`:`${j.desc} (${usedTags.join(', ')})`):j.desc,
+        Discription:usedTags.length?(zone?`${j.desc} (${usedTags.join(', ')}) - ${zone}`:`${j.desc} (${usedTags.join(', ')})`):j.desc,
         Cost:cost,
         type:t,
-        location:loc,
+        location:zone,
         enabled:j.enabled,
         costFlag:flag,
         tagCount:ea,
