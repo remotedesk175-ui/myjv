@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Work Logs — Automation</title>
+<title>Work Log — Automation</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -1792,6 +1792,7 @@ function renderTable(){
   tbody.innerHTML=filtered.map(({row,idx})=>{
     const ea=parseFloat(row.ea)||0,cost=row.cost||0,jvTotal=ea*cost;
     row.total=jvTotal;
+    const totalFlag=jvTotal<=0?'':(jvTotal<5000?'low':(jvTotal>10000?'high':'ok'));
     if(!Array.isArray(row.persons))row.persons=row.persons?[row.persons]:[];
     const isMnl=!!row.manual;
     const jvCell=isMnl?`<input type="text" value="${esc(row.jv)}" placeholder="JV" onchange="updateJV(${idx},this.value)" style="width:85px">`:`<span class="badge jv">${esc(row.jv)||'–'}</span>`;
@@ -1800,7 +1801,7 @@ function renderTable(){
     const personCell=isMnl?buildPersonSelect(idx,row.persons):`<div style="display:flex;flex-wrap:wrap">${row.persons.map(n=>{const p=PERSONS.find(x=>x.name===n);return`<span class="person-chip">${esc(n)}<span class="badge lv${p?p.level:3}" style="margin-left:3px">L${p?p.level:3}</span></span>`;}).join('')}</div>`;
     const splits=computeSplits(row.persons);
     const splitStr=row.persons.length>1?splitLabel(splits,jvTotal):'';
-    return`<tr style="${isMnl?'background:rgba(99,102,241,0.04)':''}">
+    return`<tr style="${isMnl?'background:rgba(99,102,241,0.04)':''}${totalFlag==='low'||totalFlag==='high'?';background:rgba(239,68,68,0.05)':''}">
       <td style="color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:11px">${idx+1}${isMnl?'<br><span class="badge manual">Manual</span>':''}</td>
       <td><span class="badge day">${row.dayName}</span></td>
       <td><span class="badge date">${row.date}</span></td>
@@ -1814,7 +1815,7 @@ function renderTable(){
         ${row.eaAuto?'<span class="badge auto">AUTO</span>':''}
       </div></td>
       <td>${costCell}</td>
-      <td class="total-cell">${jvTotal>0?jvTotal.toLocaleString('th-TH',{minimumFractionDigits:0}):'–'}</td>
+      <td class="total-cell">${jvTotal>0?jvTotal.toLocaleString('th-TH',{minimumFractionDigits:0}):'–'}${totalFlag==='low'?`<div style="font-size:9px;color:var(--red);white-space:nowrap">⚠ &lt;5,000</div>`:''}${totalFlag==='high'?`<div style="font-size:9px;color:var(--red);white-space:nowrap">⚠ &gt;10,000</div>`:''}</td>
       <td class="split-cell">${esc(splitStr)}</td>
       <td><button class="btn sm red icon" onclick="deleteRow(${idx})">🗑</button></td>
     </tr>`;
