@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Work Logs — Automation</title>
+<title>Work Log — Automation</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -120,15 +120,6 @@ thead th{
 }
 thead th.th-job{color:var(--accent);border-bottom:2px solid rgba(245,158,11,.4)}
 thead th.th-cost{color:var(--blue);border-bottom:2px solid rgba(99,102,241,.4)}
-th.sortable{cursor:pointer;user-select:none;position:relative;padding-right:16px!important}
-th.sortable:hover{background:rgba(255,255,255,.04)}
-th.sortable::after{content:'⇅';position:absolute;right:4px;opacity:.35;font-size:10px}
-th.sortable.sort-asc::after{content:'↑';opacity:1;color:var(--accent)}
-th.sortable.sort-desc::after{content:'↓';opacity:1;color:var(--accent)}
-.pagination-btn{padding:5px 10px;font-size:12px;border-radius:6px;border:1px solid rgba(255,255,255,.1);background:var(--bg2);color:var(--text2);cursor:pointer}
-.pagination-btn:hover:not(:disabled){background:rgba(255,255,255,.08)}
-.pagination-btn.active{background:var(--accent);color:#000;font-weight:700;border-color:var(--accent)}
-.pagination-btn:disabled{opacity:.35;cursor:not-allowed}
 .section-row th{background:var(--surface);padding:6px 10px;font-size:10px;font-weight:700;letter-spacing:.8px}
 .section-row th.s-job{color:var(--accent);background:rgba(245,158,11,.05);border-left:3px solid var(--accent)}
 .section-row th.s-cost{color:var(--blue);background:rgba(99,102,241,.05);border-left:3px solid var(--blue)}
@@ -399,10 +390,6 @@ select option{background:var(--surface2)}
         <label style="font-size:13px;color:var(--text2);font-weight:600">บุคคล:</label>
         <div style="display:flex;gap:5px;flex-wrap:wrap" id="filterPersonBtns"></div>
       </div>
-      <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:180px">
-        <label style="font-size:13px;color:var(--text2);font-weight:600">🔎</label>
-        <input type="text" id="logSearchInput" placeholder="ค้นหา Description, JV, Person, Date..." oninput="handleLogSearch()" style="padding:6px 10px;font-size:13px;flex:1;min-width:140px">
-      </div>
       <button class="btn ghost sm" onclick="clearFilters()" style="margin-left:auto">✖ ล้างตัวกรอง</button>
       <span id="filterCount" style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace"></span>
     </div>
@@ -417,11 +404,11 @@ select option{background:var(--surface2)}
             <th colspan="6" class="s-cost">💰 Cost Info</th>
           </tr>
           <tr>
-            <th class="th-job sortable" data-column="idx" onclick="handleLogSort('idx')">#</th><th class="th-job sortable" data-column="dayName" onclick="handleLogSort('dayName')">Day</th><th class="th-job sortable" data-column="date" onclick="handleLogSort('date')">Date</th>
-            <th class="th-job sortable" data-column="workOrder" onclick="handleLogSort('workOrder')">Work Order</th><th class="th-job sortable" data-column="jv" onclick="handleLogSort('jv')">JV</th>
-            <th class="th-job">Dept</th><th class="th-job sortable" data-column="description" onclick="handleLogSort('description')">Description</th>
-            <th class="th-cost">Person(s)</th><th class="th-cost sortable" data-column="ea" onclick="handleLogSort('ea')">EA</th>
-            <th class="th-cost sortable" data-column="cost" onclick="handleLogSort('cost')">Cost</th><th class="th-cost sortable" data-column="total" onclick="handleLogSort('total')">Total</th>
+            <th class="th-job">#</th><th class="th-job">Day</th><th class="th-job">Date</th>
+            <th class="th-job">Work Order</th><th class="th-job">JV</th>
+            <th class="th-job">Dept</th><th class="th-job">Description</th>
+            <th class="th-cost">Person(s)</th><th class="th-cost">EA</th>
+            <th class="th-cost">Cost</th><th class="th-cost">Total</th>
             <th class="th-cost">Split</th><th class="th-cost"></th>
           </tr>
         </thead>
@@ -429,19 +416,6 @@ select option{background:var(--surface2)}
           <tr><td colspan="13" class="empty-state"><div class="ico">📊</div>ยังไม่มีข้อมูล</td></tr>
         </tbody>
       </table>
-    </div>
-    <div class="pagination-bar" id="logPaginationBar" style="display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap">
-      <span id="logPaginationInfo" style="font-size:12px;color:var(--text3)"></span>
-      <div style="display:flex;align-items:center;gap:6px;margin-left:auto">
-        <label style="font-size:12px;color:var(--text2)">แสดง:</label>
-        <select id="logPageSize" onchange="handleLogPageSizeChange()" style="padding:4px 8px;font-size:12px">
-          <option value="25">25</option>
-          <option value="50" selected>50</option>
-          <option value="100">100</option>
-          <option value="-1">ทั้งหมด</option>
-        </select>
-      </div>
-      <div id="logPaginationNav" style="display:flex;gap:4px"></div>
     </div>
   </div>
 </div>
@@ -822,9 +796,6 @@ let jvData=[],descData=[],manualDescs=[],logRows=[],shiftData={},otData=[],reqRo
 let pmtestData=[];
 let pmtestLocFilter=new Set();
 let filterPersons=new Set();
-let logSearchQuery='';
-let logSort={column:'',direction:'asc'};
-let logPagination={currentPage:1};
 let weeklyUsed={week:'',usedKeys:new Set()}; // track JV+tags ที่ใช้ในสัปดาห์นี้
 let dbConnected=false;
 let GIST_ID='',GIST_TOKEN='',GIST_JV_ID='';
@@ -1321,37 +1292,6 @@ function normalizeJVData(arr){
     };
   }).filter(r=>r.tag||r.desc);
 }
-/* ══ EA RANGE CALC — เลือก Tag ให้มากที่สุดเท่าที่ทำได้ โดย Total Cost (EA × Unit Cost) ห้ามเกิน 10,000 ══
-   ea = จำนวน Tag สูงสุดที่เลือกได้ โดยไม่เกิน 10,000 (จำกัดด้วย maxEA) และไม่เกินจำนวนเครื่องจักรที่มี (availableCount)
-   ไม่มีขั้นต่ำบังคับ — ได้เท่าไหร่เอาเท่านั้น ขอแค่เข้าใกล้ 10,000 ที่สุดเท่าที่มีเครื่องจักรพอ
-   flag:
-     'ok'   Total อยู่ในเกณฑ์ (ไม่เกิน 10,000)
-     'high' Total>10,000 เพราะ Unit Cost สูงเกิน 10,000/ตัว (หลีกเลี่ยงไม่ได้ แม้ ea=1)
-*/
-function computeEAForCostRange(cost, availableCount){
-  availableCount=Math.max(0,availableCount||0);
-  if(availableCount===0)return{ea:0,baseTagCount:0,total:0,flag:'ok'};
-  if(!cost||cost<=0)return{ea:availableCount,baseTagCount:availableCount,total:0,flag:'ok'};
-
-  const maxEA=Math.floor(10000/cost); // ห้ามเกิน 10,000
-  const ea=maxEA>0?Math.min(availableCount,maxEA):1;
-
-  const total=ea*cost;
-  const flag=total>10000?'high':'ok';
-  return{ea,baseTagCount:ea,total,flag};
-}
-
-/* ══ ZONE HELPER — ใช้ 2 คำแรกของ Location เป็นตัวกำหนดโซน ══
-   "Stock prep NBKP&LBKP pulper" และ "Stock prep NBKP&LBKP washer" → โซนเดียวกัน "Stock prep"
-   ทำให้อนุโลมผสม Location ต่างกันได้ ถ้าอยู่ในโซน/พื้นที่เดียวกัน
-*/
-function getZone(location){
-  const s=String(location||'').trim();
-  if(!s)return'';
-  const words=s.split(/\s+/);
-  return words.slice(0,2).join(' ');
-}
-
 /* ══ POOL — 1 item ต่อ JV ที่ enabled, จำนวน Tag ตาม cost limit 10,000 ══
    Logic:
    1. วน JV ทุกตัวที่ enabled=1 และมี type ตรงกับ pmtest
@@ -1387,33 +1327,20 @@ function getMergedPool(){
     const matchMachines=machinesByType[t]||[];
     if(!matchMachines.length)return;
     const cost=j.cost||0;
-    // จัดกลุ่มเครื่องจักรตามโซน (2 คำแรกของ Location) — อนุโลมผสม Location ต่างกันได้ถ้าอยู่โซนเดียวกัน
-    const byZone={};
-    matchMachines.forEach(m=>{
-      const zone=getZone(m.location);
-      if(!byZone[zone])byZone[zone]=[];
-      byZone[zone].push(m);
-    });
-    Object.keys(byZone).forEach(zone=>{
-      const zoneMachines=byZone[zone];
-      const{ea,flag}=computeEAForCostRange(cost,zoneMachines.length);
-      if(ea<=0)return;
-      // shuffle เครื่องจักรในโซนนี้ แล้วเลือก ea ตัว
-      const shuffled=[...zoneMachines].sort(()=>Math.random()-.5);
-      const usedTags=shuffled.slice(0,ea).map(m=>m.tag);
-      pool.push({
-        JV:j.tag,
-        Discription:zone?`${j.desc} (${usedTags.join(', ')}) - ${zone}`:`${j.desc} (${usedTags.join(', ')})`,
-        Cost:cost,
-        type:t,
-        location:zone,
-        tagCount:ea,
-        totalCost:ea*cost,
-        costFlag:flag,
-        tags:usedTags,
-        src:j.src,
-        id:j.id
-      });
+    const maxTags=cost>0?Math.floor(10000/cost):matchMachines.length;
+    const ea=Math.max(1,Math.min(matchMachines.length,maxTags));
+    // shuffle machines แล้วเลือก ea ตัว
+    const shuffled=[...matchMachines].sort(()=>Math.random()-.5);
+    const usedTags=shuffled.slice(0,ea).map(m=>m.tag);
+    pool.push({
+      JV:j.tag,
+      Discription:`${j.desc} (${usedTags.join(', ')})`,
+      Cost:cost,
+      type:t,
+      tagCount:ea,
+      tags:usedTags,
+      src:j.src,
+      id:j.id
     });
   });
   return pool;
@@ -1436,39 +1363,24 @@ function getMergedPoolStable(){
     if(!machinesByType[t])machinesByType[t]=[];
     machinesByType[t].push(m);
   });
-  return allJV.flatMap(j=>{
+  return allJV.map(j=>{
     const t=(j.type||'').toLowerCase();
     const matchMachines=machinesByType[t]||[];
     const cost=j.cost||0;
-    if(!matchMachines.length){
-      return[{JV:j.tag,Discription:j.desc,Cost:cost,type:t,enabled:j.enabled,costFlag:'ok',tagCount:0,src:j.src,id:j.id}];
-    }
-    // จัดกลุ่มเครื่องจักรตามโซน (2 คำแรกของ Location) — อนุโลมผสม Location ต่างกันได้ถ้าอยู่โซนเดียวกัน
-    const byZone={};
-    matchMachines.forEach(m=>{
-      const zone=getZone(m.location);
-      if(!byZone[zone])byZone[zone]=[];
-      byZone[zone].push(m);
-    });
-    return Object.keys(byZone).map(zone=>{
-      const zoneMachines=byZone[zone];
-      const{ea,baseTagCount,total,flag}=computeEAForCostRange(cost,zoneMachines.length);
-      const usedTags=zoneMachines.slice(0,ea).map(m=>m.tag);
-      return{
-        JV:j.tag,
-        Discription:usedTags.length?(zone?`${j.desc} (${usedTags.join(', ')}) - ${zone}`:`${j.desc} (${usedTags.join(', ')})`):j.desc,
-        Cost:cost,
-        type:t,
-        location:zone,
-        enabled:j.enabled,
-        costFlag:flag,
-        tagCount:ea,
-        baseTagCount,
-        totalCost:total,
-        src:j.src,
-        id:j.id
-      };
-    });
+    const maxTags=cost>0?Math.floor(10000/cost):matchMachines.length;
+    const ea=Math.max(1,Math.min(matchMachines.length||1,maxTags));
+    const usedTags=matchMachines.slice(0,ea).map(m=>m.tag);
+    return{
+      JV:j.tag,
+      Discription:usedTags.length?`${j.desc} (${usedTags.join(', ')})`:j.desc,
+      Cost:cost,
+      type:t,
+      enabled:j.enabled,
+      costFlag:cost>0&&ea*cost>10000?'high':'ok',
+      tagCount:ea,
+      src:j.src,
+      id:j.id
+    };
   });
 }
 function getCostByJV(tag){
@@ -1485,13 +1397,17 @@ function renderPool(){
   document.getElementById('poolCount').textContent=pool.filter(p=>p.enabled).length+' รายการ (สุ่มได้)';
   const tbody=document.getElementById('poolRows');
   if(!pool.length){tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text3)">ว่างเปล่า — โหลดไฟล์ JV และ pmtest ก่อน</td></tr>`;return;}
-  tbody.innerHTML=pool.map((item,i)=>`<tr style="${!item.enabled?'opacity:0.45':''}${item.costFlag==='high'?';background:rgba(239,68,68,0.04)':''}">
+  tbody.innerHTML=pool.map((item,i)=>`<tr style="${!item.enabled?'opacity:0.45':''}${item.costFlag==='low'?';background:rgba(239,68,68,0.04)':''}">
     <td style="color:var(--text3);font-size:11px;font-family:'JetBrains Mono',monospace">${i+1}</td>
     <td><span class="badge jv" style="font-size:10px">${esc(item.JV)||'–'}</span></td>
     <td style="font-size:12px;max-width:260px;white-space:normal">${esc(item.Discription)}</td>
     <td><span class="badge dept" style="font-size:10px">${esc(item.type)||'–'}</span></td>
-    <td style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--green)">${item.Cost>0?item.Cost.toLocaleString():'–'}</td>
-    <td style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--purple)">${item.tagCount||'–'}${item.costFlag==='high'?`<div style="font-size:9px;color:var(--red)">⚠ Total &gt;10k (${(item.totalCost||0).toLocaleString()})</div>`:''}</td>
+    <td style="font-family:'JetBrains Mono',monospace;font-size:12px;color:${item.costFlag==='low'?'var(--red)':'var(--green)'}">${item.Cost>0?item.Cost.toLocaleString():'–'}${item.costFlag==='low'?'<span style="font-size:9px;margin-left:4px;color:var(--red)">⚠ &lt;5k</span>':''}</td>
+    <td style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--purple)">${
+      item.costFlag==='low'&&item.tagCount!==item.baseTagCount
+        ?`<span title="Tag จริง ${item.baseTagCount} + เพิ่มจาก cost<5000">${item.tagCount} <span style="font-size:9px;color:var(--accent)">↑${item.baseTagCount}</span></span>`
+        :(item.tagCount||'–')
+    }</td>
     <td>${item.enabled?'<span class="badge green" style="font-size:10px">✅ 1</span>':'<span class="badge red" style="font-size:10px">🚫 0</span>'}</td>
     <td><span class="badge ${item.src==='manual'?'purple':'day'}">${item.src==='manual'?'Manual':'Excel'}</span></td>
     <td>${item.src==='manual'?`<button class="btn sm red" onclick="removeManual(${item.id})">🗑</button>`:''}</td>
@@ -1650,7 +1566,7 @@ function isPersonOff(name,date){return shiftData[name]?shiftData[name].has(date)
 function updateInfo(){
   const poolAll=getMergedPoolStable();
   const poolEnabled=poolAll.filter(p=>p.enabled);
-  const highTotal=poolEnabled.filter(p=>p.costFlag==='high');
+  const lowCost=poolEnabled.filter(p=>p.Cost<5000);
   let msg='';
   if(!pmtestData.length&&!jvData.length){
     msg='⚠ โหลดไฟล์ JV Cost และ pmtest ในหน้า "ตั้งค่า/Import" ก่อน';
@@ -1658,8 +1574,7 @@ function updateInfo(){
     msg=`⚠ ยังไม่ได้โหลด pmtest — JV พร้อม ${jvData.length} รายการ`;
   } else {
     const locInfo=pmtestLocFilter.size>0?` | กรอง Location: ${[...pmtestLocFilter].join(', ')}`:'';
-    let warnInfo='';
-    if(highTotal.length>0)warnInfo+=` | <span class="badge red" style="font-size:10px">⚠ Total Cost &gt;10,000: ${highTotal.length} รายการ (Unit Cost สูงเกิน 10,000/ตัว)</span>`;
+    const warnInfo=lowCost.length>0?` | <span class="badge red" style="font-size:10px">⚠ Unit Cost &lt;5000: ${lowCost.length} รายการ (จะเลือก &gt;7500 แทน)</span>`:'';
     msg=`✅ Pool: เครื่องจักร ${pmtestData.length} เครื่อง | JV สุ่มได้: ${jvData.filter(j=>j.enabled).length} รายการ | Pool รวม: ${poolEnabled.length}${locInfo}${warnInfo}`;
   }
   document.getElementById('infoBar').innerHTML=msg;
@@ -1783,30 +1698,12 @@ function clearFilters(){
   document.getElementById('filterDateFrom').value='';document.getElementById('filterDateTo').value='';
   filterPersons.clear();
   document.querySelectorAll('#filterPersonBtns .person-toggle').forEach(b=>b.classList.remove('selected'));
-  logSearchQuery='';
-  const si=document.getElementById('logSearchInput');if(si)si.value='';
-  logPagination.currentPage=1;
-  renderTable();
-}
-function handleLogSearch(){
-  logSearchQuery=(document.getElementById('logSearchInput')?.value||'').toLowerCase().trim();
-  logPagination.currentPage=1;
-  renderTable();
-}
-function handleLogSort(column){
-  if(logSort.column===column)logSort.direction=logSort.direction==='asc'?'desc':'asc';
-  else{logSort.column=column;logSort.direction='asc';}
-  logPagination.currentPage=1;
-  renderTable();
-}
-function handleLogPageSizeChange(){
-  logPagination.currentPage=1;
   renderTable();
 }
 function getFilteredRows(){
   const from=document.getElementById('filterDateFrom')?.value||'';
   const to=document.getElementById('filterDateTo')?.value||'';
-  let rows=logRows.map((row,idx)=>({row,idx})).filter(({row})=>{
+  return logRows.map((row,idx)=>({row,idx})).filter(({row})=>{
     if(from&&row.date<from)return false;
     if(to&&row.date>to)return false;
     if(filterPersons.size>0){
@@ -1815,72 +1712,25 @@ function getFilteredRows(){
     }
     return true;
   });
-  if(logSearchQuery){
-    const q=logSearchQuery;
-    rows=rows.filter(({row})=>{
-      const ps=Array.isArray(row.persons)?row.persons:[row.persons||''];
-      return (row.description||'').toLowerCase().includes(q)
-        ||(row.jv||'').toLowerCase().includes(q)
-        ||(row.workOrder||'').toLowerCase().includes(q)
-        ||(row.date||'').includes(q)
-        ||ps.some(p=>(p||'').toLowerCase().includes(q));
-    });
-  }
-  if(logSort.column){
-    const col=logSort.column;
-    const mult=logSort.direction==='asc'?1:-1;
-    rows=[...rows].sort((a,b)=>{
-      let va,vb;
-      if(col==='idx'){va=a.idx;vb=b.idx;}
-      else if(col==='ea'){va=parseFloat(a.row.ea)||0;vb=parseFloat(b.row.ea)||0;}
-      else if(col==='total'){va=(parseFloat(a.row.ea)||0)*(a.row.cost||0);vb=(parseFloat(b.row.ea)||0)*(b.row.cost||0);}
-      else if(col==='cost'){va=a.row.cost||0;vb=b.row.cost||0;}
-      else{va=a.row[col]||'';vb=b.row[col]||'';}
-      if(typeof va==='number'&&typeof vb==='number')return(va-vb)*mult;
-      return String(va).localeCompare(String(vb))*mult;
-    });
-  }
-  return rows;
 }
 
 /* ══ RENDER TABLE ══ */
 function renderTable(){
   const tbody=document.getElementById('logBody');
   if(!tbody)return;
-  applySortHeaderClasses();
-  const pageBar=document.getElementById('logPaginationBar');
   if(!logRows.length){
     tbody.innerHTML=`<tr><td colspan="13" class="empty-state"><div class="ico">📊</div>ยังไม่มีข้อมูล</td></tr>`;
-    const fc=document.getElementById('filterCount');if(fc)fc.textContent='';
-    if(pageBar)pageBar.style.display='none';
-    return;
+    const fc=document.getElementById('filterCount');if(fc)fc.textContent='';return;
   }
   const filtered=getFilteredRows();
   const fc=document.getElementById('filterCount');
   if(fc)fc.textContent=`${filtered.length} / ${logRows.length} แถว`;
   if(!filtered.length){
-    tbody.innerHTML=`<tr><td colspan="13" class="empty-state"><div class="ico">🔍</div>ไม่พบข้อมูลที่ตรงกับตัวกรอง</td></tr>`;
-    if(pageBar)pageBar.style.display='none';
-    return;
+    tbody.innerHTML=`<tr><td colspan="13" class="empty-state"><div class="ico">🔍</div>ไม่พบข้อมูลที่ตรงกับตัวกรอง</td></tr>`;return;
   }
-  if(pageBar)pageBar.style.display='flex';
-  const pageSizeSel=document.getElementById('logPageSize');
-  const pageSize=parseInt(pageSizeSel?.value||'50',10);
-  const totalPages=pageSize===-1?1:Math.max(1,Math.ceil(filtered.length/pageSize));
-  if(logPagination.currentPage>totalPages)logPagination.currentPage=totalPages;
-  if(logPagination.currentPage<1)logPagination.currentPage=1;
-  const startIdx=pageSize===-1?0:(logPagination.currentPage-1)*pageSize;
-  const endIdx=pageSize===-1?filtered.length:Math.min(startIdx+pageSize,filtered.length);
-  const pageData=pageSize===-1?filtered:filtered.slice(startIdx,endIdx);
-
-  const info=document.getElementById('logPaginationInfo');
-  if(info)info.textContent=`แสดง ${filtered.length===0?0:startIdx+1}–${endIdx} จาก ${filtered.length} แถว`;
-  renderLogPaginationNav(totalPages,pageSize);
-
-  tbody.innerHTML=pageData.map(({row,idx})=>{
+  tbody.innerHTML=filtered.map(({row,idx})=>{
     const ea=parseFloat(row.ea)||0,cost=row.cost||0,jvTotal=ea*cost;
     row.total=jvTotal;
-    const totalFlag=jvTotal<=0?'':(jvTotal>10000?'high':'ok');
     if(!Array.isArray(row.persons))row.persons=row.persons?[row.persons]:[];
     const isMnl=!!row.manual;
     const jvCell=isMnl?`<input type="text" value="${esc(row.jv)}" placeholder="JV" onchange="updateJV(${idx},this.value)" style="width:85px">`:`<span class="badge jv">${esc(row.jv)||'–'}</span>`;
@@ -1889,7 +1739,7 @@ function renderTable(){
     const personCell=isMnl?buildPersonSelect(idx,row.persons):`<div style="display:flex;flex-wrap:wrap">${row.persons.map(n=>{const p=PERSONS.find(x=>x.name===n);return`<span class="person-chip">${esc(n)}<span class="badge lv${p?p.level:3}" style="margin-left:3px">L${p?p.level:3}</span></span>`;}).join('')}</div>`;
     const splits=computeSplits(row.persons);
     const splitStr=row.persons.length>1?splitLabel(splits,jvTotal):'';
-    return`<tr style="${isMnl?'background:rgba(99,102,241,0.04)':''}${totalFlag==='high'?';background:rgba(239,68,68,0.05)':''}">
+    return`<tr style="${isMnl?'background:rgba(99,102,241,0.04)':''}">
       <td style="color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:11px">${idx+1}${isMnl?'<br><span class="badge manual">Manual</span>':''}</td>
       <td><span class="badge day">${row.dayName}</span></td>
       <td><span class="badge date">${row.date}</span></td>
@@ -1903,31 +1753,12 @@ function renderTable(){
         ${row.eaAuto?'<span class="badge auto">AUTO</span>':''}
       </div></td>
       <td>${costCell}</td>
-      <td class="total-cell">${jvTotal>0?jvTotal.toLocaleString('th-TH',{minimumFractionDigits:0}):'–'}${totalFlag==='high'?`<div style="font-size:9px;color:var(--red);white-space:nowrap">⚠ &gt;10,000</div>`:''}</td>
+      <td class="total-cell">${jvTotal>0?jvTotal.toLocaleString('th-TH',{minimumFractionDigits:0}):'–'}</td>
       <td class="split-cell">${esc(splitStr)}</td>
       <td><button class="btn sm red icon" onclick="deleteRow(${idx})">🗑</button></td>
     </tr>`;
   }).join('');
 }
-function applySortHeaderClasses(){
-  document.querySelectorAll('#logTable th.sortable').forEach(th=>{
-    th.classList.remove('sort-asc','sort-desc');
-    if(th.getAttribute('data-column')===logSort.column)th.classList.add(logSort.direction==='asc'?'sort-asc':'sort-desc');
-  });
-}
-function renderLogPaginationNav(totalPages,pageSize){
-  const nav=document.getElementById('logPaginationNav');
-  if(!nav)return;
-  if(pageSize===-1){nav.innerHTML='';return;}
-  const cur=logPagination.currentPage;
-  let html=`<button class="pagination-btn" ${cur===1?'disabled':''} onclick="changeLogPage(${cur-1})">‹ ก่อนหน้า</button>`;
-  const maxV=5;let sp=Math.max(1,cur-2);let ep=Math.min(totalPages,sp+maxV-1);
-  if(ep-sp+1<maxV)sp=Math.max(1,ep-maxV+1);
-  for(let p=sp;p<=ep;p++)html+=`<button class="pagination-btn ${p===cur?'active':''}" onclick="changeLogPage(${p})">${p}</button>`;
-  html+=`<button class="pagination-btn" ${cur===totalPages?'disabled':''} onclick="changeLogPage(${cur+1})">ถัดไป ›</button>`;
-  nav.innerHTML=html;
-}
-function changeLogPage(p){logPagination.currentPage=p;renderTable();}
 function buildPersonSelect(idx,selected){
   return`<div style="display:flex;flex-wrap:wrap;gap:3px">${PERSONS.map(p=>`<span class="person-toggle ${selected.includes(p.name)?'selected':''}" onclick="togglePerson(${idx},'${p.name}')">${p.name}<span class="badge lv${p.level}" style="margin-left:3px">L${p.level}</span></span>`).join('')}</div>`;
 }
