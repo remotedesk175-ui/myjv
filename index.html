@@ -1292,6 +1292,29 @@ function normalizeJVData(arr){
     };
   }).filter(r=>r.tag||r.desc);
 }
+/* ══ EA RANGE CALC — บังคับ Total Cost (EA × Unit Cost) ห้ามต่ำกว่า 5,000 และห้ามเกิน 10,000 ══
+   ea = จำนวน Tag สูงสุดที่เลือกได้ โดยไม่เกิน 10,000 (จำกัดด้วย maxEA) และไม่เกินจำนวนเครื่องจักรที่มี (availableCount)
+   นี่คือค่าสูงสุดที่เป็นไปได้ตามข้อจำกัดทั้งสองอยู่แล้ว จึงไม่มีทางเพิ่ม ea ให้มากกว่านี้ได้อีก
+   flag:
+     'ok'   Total อยู่ในช่วง 5,000–10,000
+     'low'  Total<5,000 เพราะเครื่องจักรที่มีในกลุ่มนี้ไม่พอ (หลีกเลี่ยงไม่ได้)
+     'high' Total>10,000 เพราะ Unit Cost สูงเกิน 10,000/ตัว (หลีกเลี่ยงไม่ได้ แม้ ea=1)
+*/
+function computeEAForCostRange(cost, availableCount){
+  availableCount=Math.max(0,availableCount||0);
+  if(availableCount===0)return{ea:0,baseTagCount:0,total:0,flag:'ok'};
+  if(!cost||cost<=0)return{ea:availableCount,baseTagCount:availableCount,total:0,flag:'ok'};
+
+  const maxEA=Math.floor(10000/cost); // ห้ามเกิน 10,000
+  const ea=maxEA>0?Math.min(availableCount,maxEA):1;
+
+  const total=ea*cost;
+  let flag='ok';
+  if(total<5000)flag='low';
+  else if(total>10000)flag='high';
+  return{ea,baseTagCount:ea,total,flag};
+}
+
 /* ══ POOL — 1 item ต่อ JV ที่ enabled, จำนวน Tag ตาม cost limit 10,000 ══
    Logic:
    1. วน JV ทุกตัวที่ enabled=1 และมี type ตรงกับ pmtest
@@ -1336,8 +1359,8 @@ function getMergedPool(){
     });
     Object.keys(byLoc).forEach(loc=>{
       const locMachines=byLoc[loc];
-      const maxTags=cost>0?Math.floor(10000/cost):locMachines.length;
-      const ea=Math.max(1,Math.min(locMachines.length,maxTags));
+      const{ea,flag}=computeEAForCostRange(cost,locMachines.length);
+      if(ea<=0)return;
       // shuffle เครื่องจักรในกลุ่ม Location นี้ แล้วเลือก ea ตัว
       const shuffled=[...locMachines].sort(()=>Math.random()-.5);
       const usedTags=shuffled.slice(0,ea).map(m=>m.tag);
@@ -1348,6 +1371,8 @@ function getMergedPool(){
         type:t,
         location:loc,
         tagCount:ea,
+        totalCost:ea*cost,
+        costFlag:flag,
         tags:usedTags,
         src:j.src,
         id:j.id
@@ -1390,8 +1415,7 @@ function getMergedPoolStable(){
     });
     return Object.keys(byLoc).map(loc=>{
       const locMachines=byLoc[loc];
-      const maxTags=cost>0?Math.floor(10000/cost):locMachines.length;
-      const ea=Math.max(1,Math.min(locMachines.length||1,maxTags));
+      const{ea,baseTagCount,total,flag}=computeEAForCostRange(cost,locMachines.length);
       const usedTags=locMachines.slice(0,ea).map(m=>m.tag);
       return{
         JV:j.tag,
@@ -1400,8 +1424,10 @@ function getMergedPoolStable(){
         type:t,
         location:loc,
         enabled:j.enabled,
-        costFlag:cost>0&&ea*cost>10000?'high':'ok',
+        costFlag:flag,
         tagCount:ea,
+        baseTagCount,
+        totalCost:total,
         src:j.src,
         id:j.id
       };
@@ -1422,17 +1448,13 @@ function renderPool(){
   document.getElementById('poolCount').textContent=pool.filter(p=>p.enabled).length+' รายการ (สุ่มได้)';
   const tbody=document.getElementById('poolRows');
   if(!pool.length){tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text3)">ว่างเปล่า — โหลดไฟล์ JV และ pmtest ก่อน</td></tr>`;return;}
-  tbody.innerHTML=pool.map((item,i)=>`<tr style="${!item.enabled?'opacity:0.45':''}${item.costFlag==='low'?';background:rgba(239,68,68,0.04)':''}">
+  tbody.innerHTML=pool.map((item,i)=>`<tr style="${!item.enabled?'opacity:0.45':''}${item.costFlag==='low'||item.costFlag==='high'?';background:rgba(239,68,68,0.04)':''}">
     <td style="color:var(--text3);font-size:11px;font-family:'JetBrains Mono',monospace">${i+1}</td>
     <td><span class="badge jv" style="font-size:10px">${esc(item.JV)||'–'}</span></td>
     <td style="font-size:12px;max-width:260px;white-space:normal">${esc(item.Discription)}</td>
     <td><span class="badge dept" style="font-size:10px">${esc(item.type)||'–'}</span></td>
-    <td style="font-family:'JetBrains Mono',monospace;font-size:12px;color:${item.costFlag==='low'?'var(--red)':'var(--green)'}">${item.Cost>0?item.Cost.toLocaleString():'–'}${item.costFlag==='low'?'<span style="font-size:9px;margin-left:4px;color:var(--red)">⚠ &lt;5k</span>':''}</td>
-    <td style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--purple)">${
-      item.costFlag==='low'&&item.tagCount!==item.baseTagCount
-        ?`<span title="Tag จริง ${item.baseTagCount} + เพิ่มจาก cost<5000">${item.tagCount} <span style="font-size:9px;color:var(--accent)">↑${item.baseTagCount}</span></span>`
-        :(item.tagCount||'–')
-    }</td>
+    <td style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--green)">${item.Cost>0?item.Cost.toLocaleString():'–'}</td>
+    <td style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--purple)">${item.tagCount||'–'}${item.costFlag==='low'?`<div style="font-size:9px;color:var(--red)">⚠ Total &lt;5k (${(item.totalCost||0).toLocaleString()})</div>`:''}${item.costFlag==='high'?`<div style="font-size:9px;color:var(--red)">⚠ Total &gt;10k (${(item.totalCost||0).toLocaleString()})</div>`:''}</td>
     <td>${item.enabled?'<span class="badge green" style="font-size:10px">✅ 1</span>':'<span class="badge red" style="font-size:10px">🚫 0</span>'}</td>
     <td><span class="badge ${item.src==='manual'?'purple':'day'}">${item.src==='manual'?'Manual':'Excel'}</span></td>
     <td>${item.src==='manual'?`<button class="btn sm red" onclick="removeManual(${item.id})">🗑</button>`:''}</td>
@@ -1591,7 +1613,8 @@ function isPersonOff(name,date){return shiftData[name]?shiftData[name].has(date)
 function updateInfo(){
   const poolAll=getMergedPoolStable();
   const poolEnabled=poolAll.filter(p=>p.enabled);
-  const lowCost=poolEnabled.filter(p=>p.Cost<5000);
+  const lowTotal=poolEnabled.filter(p=>p.costFlag==='low');
+  const highTotal=poolEnabled.filter(p=>p.costFlag==='high');
   let msg='';
   if(!pmtestData.length&&!jvData.length){
     msg='⚠ โหลดไฟล์ JV Cost และ pmtest ในหน้า "ตั้งค่า/Import" ก่อน';
@@ -1599,7 +1622,9 @@ function updateInfo(){
     msg=`⚠ ยังไม่ได้โหลด pmtest — JV พร้อม ${jvData.length} รายการ`;
   } else {
     const locInfo=pmtestLocFilter.size>0?` | กรอง Location: ${[...pmtestLocFilter].join(', ')}`:'';
-    const warnInfo=lowCost.length>0?` | <span class="badge red" style="font-size:10px">⚠ Unit Cost &lt;5000: ${lowCost.length} รายการ (จะเลือก &gt;7500 แทน)</span>`:'';
+    let warnInfo='';
+    if(lowTotal.length>0)warnInfo+=` | <span class="badge red" style="font-size:10px">⚠ Total Cost &lt;5,000: ${lowTotal.length} รายการ (เครื่องจักรไม่พอให้ถึงขั้นต่ำ)</span>`;
+    if(highTotal.length>0)warnInfo+=` | <span class="badge red" style="font-size:10px">⚠ Total Cost &gt;10,000: ${highTotal.length} รายการ (Unit Cost สูงเกิน 10,000/ตัว)</span>`;
     msg=`✅ Pool: เครื่องจักร ${pmtestData.length} เครื่อง | JV สุ่มได้: ${jvData.filter(j=>j.enabled).length} รายการ | Pool รวม: ${poolEnabled.length}${locInfo}${warnInfo}`;
   }
   document.getElementById('infoBar').innerHTML=msg;
