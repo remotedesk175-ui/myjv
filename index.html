@@ -1327,20 +1327,31 @@ function getMergedPool(){
     const matchMachines=machinesByType[t]||[];
     if(!matchMachines.length)return;
     const cost=j.cost||0;
-    const maxTags=cost>0?Math.floor(10000/cost):matchMachines.length;
-    const ea=Math.max(1,Math.min(matchMachines.length,maxTags));
-    // shuffle machines แล้วเลือก ea ตัว
-    const shuffled=[...matchMachines].sort(()=>Math.random()-.5);
-    const usedTags=shuffled.slice(0,ea).map(m=>m.tag);
-    pool.push({
-      JV:j.tag,
-      Discription:`${j.desc} (${usedTags.join(', ')})`,
-      Cost:cost,
-      type:t,
-      tagCount:ea,
-      tags:usedTags,
-      src:j.src,
-      id:j.id
+    // จัดกลุ่มเครื่องจักรตาม Location — ห้ามผสม Location ต่างกันใน 1 Work Order เดียว
+    const byLoc={};
+    matchMachines.forEach(m=>{
+      const loc=m.location||'';
+      if(!byLoc[loc])byLoc[loc]=[];
+      byLoc[loc].push(m);
+    });
+    Object.keys(byLoc).forEach(loc=>{
+      const locMachines=byLoc[loc];
+      const maxTags=cost>0?Math.floor(10000/cost):locMachines.length;
+      const ea=Math.max(1,Math.min(locMachines.length,maxTags));
+      // shuffle เครื่องจักรในกลุ่ม Location นี้ แล้วเลือก ea ตัว
+      const shuffled=[...locMachines].sort(()=>Math.random()-.5);
+      const usedTags=shuffled.slice(0,ea).map(m=>m.tag);
+      pool.push({
+        JV:j.tag,
+        Discription:loc?`${j.desc} (${usedTags.join(', ')}) - ${loc}`:`${j.desc} (${usedTags.join(', ')})`,
+        Cost:cost,
+        type:t,
+        location:loc,
+        tagCount:ea,
+        tags:usedTags,
+        src:j.src,
+        id:j.id
+      });
     });
   });
   return pool;
@@ -1363,24 +1374,38 @@ function getMergedPoolStable(){
     if(!machinesByType[t])machinesByType[t]=[];
     machinesByType[t].push(m);
   });
-  return allJV.map(j=>{
+  return allJV.flatMap(j=>{
     const t=(j.type||'').toLowerCase();
     const matchMachines=machinesByType[t]||[];
     const cost=j.cost||0;
-    const maxTags=cost>0?Math.floor(10000/cost):matchMachines.length;
-    const ea=Math.max(1,Math.min(matchMachines.length||1,maxTags));
-    const usedTags=matchMachines.slice(0,ea).map(m=>m.tag);
-    return{
-      JV:j.tag,
-      Discription:usedTags.length?`${j.desc} (${usedTags.join(', ')})`:j.desc,
-      Cost:cost,
-      type:t,
-      enabled:j.enabled,
-      costFlag:cost>0&&ea*cost>10000?'high':'ok',
-      tagCount:ea,
-      src:j.src,
-      id:j.id
-    };
+    if(!matchMachines.length){
+      return[{JV:j.tag,Discription:j.desc,Cost:cost,type:t,enabled:j.enabled,costFlag:'ok',tagCount:0,src:j.src,id:j.id}];
+    }
+    // จัดกลุ่มเครื่องจักรตาม Location — ห้ามผสม Location ต่างกันใน 1 Work Order เดียว
+    const byLoc={};
+    matchMachines.forEach(m=>{
+      const loc=m.location||'';
+      if(!byLoc[loc])byLoc[loc]=[];
+      byLoc[loc].push(m);
+    });
+    return Object.keys(byLoc).map(loc=>{
+      const locMachines=byLoc[loc];
+      const maxTags=cost>0?Math.floor(10000/cost):locMachines.length;
+      const ea=Math.max(1,Math.min(locMachines.length||1,maxTags));
+      const usedTags=locMachines.slice(0,ea).map(m=>m.tag);
+      return{
+        JV:j.tag,
+        Discription:usedTags.length?(loc?`${j.desc} (${usedTags.join(', ')}) - ${loc}`:`${j.desc} (${usedTags.join(', ')})`):j.desc,
+        Cost:cost,
+        type:t,
+        location:loc,
+        enabled:j.enabled,
+        costFlag:cost>0&&ea*cost>10000?'high':'ok',
+        tagCount:ea,
+        src:j.src,
+        id:j.id
+      };
+    });
   });
 }
 function getCostByJV(tag){
